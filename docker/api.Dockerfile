@@ -9,10 +9,11 @@ COPY apps/mocks/package.json apps/mocks/
 COPY apps/web/package.json apps/web/
 COPY packages/common-ground/package.json packages/common-ground/
 COPY packages/telemetry/package.json packages/telemetry/
+# `@riviera/api...` also installs the dependencies of its workspace packages (telemetry).
 # The optional `extra_ca` build secret lets builds run behind a TLS-intercepting proxy.
 # It is not set in CI and never ends up in the image.
 RUN --mount=type=secret,id=extra_ca,required=false \
-    NODE_EXTRA_CA_CERTS=/run/secrets/extra_ca pnpm install --frozen-lockfile --prod --filter @riviera/api
+    NODE_EXTRA_CA_CERTS=/run/secrets/extra_ca pnpm install --frozen-lockfile --prod --filter "@riviera/api..."
 
 FROM node:22.23.5-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a
 ENV NODE_ENV=production
@@ -22,6 +23,7 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=deps /app/packages/telemetry/node_modules ./packages/telemetry/node_modules
 COPY package.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/api/src apps/api/src
