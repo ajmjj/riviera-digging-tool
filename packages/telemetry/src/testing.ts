@@ -8,7 +8,7 @@ import {
   type MetricData,
 } from "@opentelemetry/sdk-metrics";
 import { InMemorySpanExporter, type ReadableSpan } from "@opentelemetry/sdk-trace";
-import { startTelemetry, type Telemetry, type TelemetryOptions } from "./sdk.ts";
+import { startTelemetry, type Exporters, type Telemetry, type TelemetryOptions } from "./sdk.ts";
 
 export interface TestTelemetry {
   readonly telemetry: Telemetry;
@@ -52,5 +52,39 @@ export function startTestTelemetry(options: Partial<TelemetryOptions> = {}): Tes
       );
     },
     shutdown: () => telemetry.shutdown(),
+  };
+}
+
+export interface MemoryExporters {
+  readonly exporters: Exporters;
+  readonly spans: () => ReadableSpan[];
+  readonly logs: () => ReadableLogRecord[];
+  /** The metrics of the latest export (cumulative). */
+  readonly metrics: () => MetricData[];
+}
+
+/**
+ * In-memory exporters to hand to code that starts its own SDK (the api's startup). Their
+ * shutdown keeps what was exported, so it stays readable once the service has stopped.
+ */
+export function memoryExporters(): MemoryExporters {
+  const spans = new InMemorySpanExporter();
+  const logs = new InMemoryLogRecordExporter();
+  const metrics = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+  const kept = { shutdown: () => Promise.resolve() };
+  const exporters: Exporters = {
+    spans: { ...kept, export: spans.export.bind(spans), forceFlush: () => spans.forceFlush() },
+    logs: { ...kept, export: logs.export.bind(logs), forceFlush: () => logs.forceFlush() },
+    metrics,
+  };
+  return {
+    exporters,
+    spans: () => spans.getFinishedSpans(),
+    logs: () => logs.getFinishedLogRecords(),
+    metrics: () =>
+      metrics
+        .getMetrics()
+        .at(-1)
+        ?.scopeMetrics.flatMap((scope) => scope.metrics) ?? [],
   };
 }

@@ -52,6 +52,9 @@ services:
     environment:
       <<: *node-env
       PORT: "3000"
+      # Dev-only key for the Common Ground mock (it answers 401 without one); empty means unset.
+      # Only the api calls Common Ground. `make up-dev` sets a dev value (specs/001 notes.md).
+      COMMON_GROUND_DEV_API_KEY: ${COMMON_GROUND_DEV_API_KEY:-}
     healthcheck:
       test:
         - CMD

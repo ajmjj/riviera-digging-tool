@@ -133,6 +133,17 @@ describe("compose profile observability", () => {
       expect(env["DISCOGS_URL"], name).toBe("${DISCOGS_URL:-}");
     }
   });
+
+  it("001/FR-027: only the api gets the Common Ground mock key, empty by default and set by up-dev", () => {
+    expect(environment("api")["COMMON_GROUND_DEV_API_KEY"]).toBe("${COMMON_GROUND_DEV_API_KEY:-}");
+    expect(environment("worker")["COMMON_GROUND_DEV_API_KEY"]).toBeUndefined();
+    const makefile = readFileSync("Makefile", "utf8");
+    const sampleFlows = /^SAMPLE_FLOWS := ((?:.*\\\n)*.*)$/m.exec(makefile)?.[1] ?? "";
+    expect(sampleFlows).toMatch(/\bCOMMON_GROUND_DEV_API_KEY=dev-only-mock-key\b/);
+    expect(makefile).toMatch(
+      /^up-dev:.*\n\t\$\(OTLP_ENDPOINT\) \$\(SAMPLE_FLOWS\) docker compose/m,
+    );
+  });
 });
 
 describe("collector config", () => {

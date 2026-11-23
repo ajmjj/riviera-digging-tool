@@ -154,6 +154,29 @@ describe("001/FR-012: one client span per outbound call", () => {
     expect((await onlySpan()).name).toBe("common_ground SampleShopConfig");
   });
 
+  it("001/FR-020: one throwing recorder doesn't lose the other recorder's point", async () => {
+    const instruments = createInstruments(telemetry.telemetry.meterProvider.getMeter("t"), {
+      routes: [],
+    });
+    const fail = () => {
+      throw new TypeError("recorder failed");
+    };
+    for (const broken of [{ add: fail }, { record: fail }]) {
+      const cg = createCommonGround({
+        client: createExternalClient({
+          instruments: { ...instruments, ...broken },
+          fetch: () => Promise.resolve(Response.json(SHOP)),
+        }),
+        url: MOCKS,
+        apiKey: undefined,
+      });
+      await expect(cg.sampleShopConfig()).resolves.toEqual(SHOP.data);
+    }
+    // The first call loses only its counter point, the second only its duration point.
+    expect(await points("riviera.external.calls")).toEqual({ "common_ground/success": 1 });
+    expect(await points("riviera.external.duration")).toEqual({ "common_ground/success": 1 });
+  });
+
   it("001/FR-012: the inlined document equals the codegen-validated .graphql file", () => {
     const path = "../../../packages/common-ground/operations/admin/SampleShopConfig.graphql";
     const file = readFileSync(new URL(path, import.meta.url), "utf8");
