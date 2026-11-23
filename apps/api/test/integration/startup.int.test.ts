@@ -17,6 +17,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await service?.stop();
   service = undefined;
+  vi.unstubAllEnvs();
   await db.drop();
 });
 
@@ -172,7 +173,6 @@ describe("001/FR-014: startup exports every counter as 0 before it listens (rese
     await service.app.inject("/no/such/path");
     await service.stop();
     await sink.close();
-    vi.unstubAllEnvs();
     expect(sink.received).toEqual([]);
   });
 });
