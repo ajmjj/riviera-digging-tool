@@ -175,18 +175,32 @@ describe("001/FR-013: mock URLs only", () => {
   });
 
   it.each([
+    ["https://api-admin.common-ground.io/graphql"],
+    ["https://riviera.common-ground.io/graphql"],
+    ["https://common-ground.io"],
+    ["http://API-ADMIN.Common-Ground.IO.:443/graphql"],
+  ])("001/FR-013: refuses Common Ground URL %s", (url) => {
+    for (const name of ["COMMON_GROUND_URL", "DISCOGS_URL"]) {
+      expect(() => loadConfig({ ...dev, ...flagOn, [name]: url }, "api")).toThrow(
+        `${name} must point at the local mock, never common-ground.io`,
+      );
+    }
+  });
+
+  it.each([
     ["https://api.example.com/graphql"],
     ["https://notdiscogs.com"],
+    ["https://notcommon-ground.io"],
     ["http://8.8.8.8:4000"],
     ["http://172.15.0.1"],
     ["http://172.32.0.1"],
     ["http://192.169.0.1"],
     ["http://11.0.0.1"],
     ["http://[2001:db8::1]:4000"],
-  ])("001/FR-013: refuses public host %s (the Common Ground API host among them)", (url) => {
+  ])("001/FR-013: refuses public host %s", (url) => {
     for (const name of ["COMMON_GROUND_URL", "DISCOGS_URL"]) {
       expect(() => loadConfig({ ...dev, ...flagOn, [name]: url }, "api")).toThrow(
-        `${name} must point at the local mock, not a public host such as Common Ground`,
+        `${name} must point at the local mock, not a public host`,
       );
     }
   });

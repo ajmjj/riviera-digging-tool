@@ -101,6 +101,8 @@ function parseFlag(raw: string | undefined, name: string): boolean {
   throw new Error(`${name} must be "true" or "false", got "${raw}"`);
 }
 
+const REAL_DOMAINS = ["discogs.com", "common-ground.io"];
+
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
 /** Loopback or private-range IPv4, i.e. never a public address. */
@@ -115,10 +117,11 @@ function isLocalIpv4(host: string): boolean {
 }
 
 /**
- * The sample flows may only reach the local mocks (research R16, FR-013). discogs.com and its
- * subdomains are refused by name; every other public host is refused too, which covers the
- * Common Ground API host: a mock URL must be a single-label name (the compose service `mocks`),
- * localhost, or a loopback or private address.
+ * The sample flows may only reach the local mocks (research R16, FR-013). The real hosts are
+ * refused by name: discogs.com and common-ground.io (the Admin API at api-admin.common-ground.io,
+ * each shop's Client API at <shop>.common-ground.io), with their subdomains. As a backstop every
+ * other public host is refused too: a mock URL must be a single-label name (the compose service
+ * `mocks`), localhost, or a loopback or private address.
  */
 function parseMockUrl(env: Env, name: string): URL {
   const raw = optional(env, name);
@@ -127,8 +130,10 @@ function parseMockUrl(env: Env, name: string): URL {
   }
   const url = parseHttpUrl(raw, name);
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
-  if (host === "discogs.com" || host.endsWith(".discogs.com")) {
-    throw new Error(`${name} must point at the local mock, never discogs.com (got ${host})`);
+  for (const real of REAL_DOMAINS) {
+    if (host === real || host.endsWith(`.${real}`)) {
+      throw new Error(`${name} must point at the local mock, never ${real} (got ${host})`);
+    }
   }
   const local =
     host === "localhost" ||
@@ -136,9 +141,7 @@ function parseMockUrl(env: Env, name: string): URL {
     host === "[::1]" ||
     (IPV4.test(host) ? isLocalIpv4(host) : !host.includes(".") && !host.startsWith("["));
   if (!local) {
-    throw new Error(
-      `${name} must point at the local mock, not a public host such as Common Ground (got ${host})`,
-    );
+    throw new Error(`${name} must point at the local mock, not a public host (got ${host})`);
   }
   return url;
 }
