@@ -8,6 +8,7 @@
     "start:worker": "node src/main.ts worker"
   },
   "dependencies": {
+    "@riviera/telemetry": "workspace:*",
     "fastify": "5.12.8",
     "pg": "8.23.1"
   },
