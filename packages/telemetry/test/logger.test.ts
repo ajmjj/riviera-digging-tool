@@ -224,6 +224,12 @@ describe("redaction (001/FR-005)", () => {
       res: { statusCode: 202 },
     });
     expect(Object.keys(lines()[0]?.["req"] ?? {})).toEqual(["method", "url", "headers"]);
+    // The planted `x-request-id` (req_1) is off the allow-list: only the validated ID is ever
+    // logged, as `request_id` (001/FR-003).
+    expect(lines()[0]?.["req"]).toHaveProperty("headers", {
+      "user-agent": "curl/8.0",
+      "content-type": "application/json",
+    });
     expect(raw.join("")).not.toContain("req_1");
     expect(lines()[0]?.["res"]).toEqual({ statusCode: 202 });
   });
