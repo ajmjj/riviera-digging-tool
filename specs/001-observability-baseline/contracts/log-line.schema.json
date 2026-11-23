@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "specs/001-observability-baseline/contracts/log-line.schema.json",
+  "title": "Riviera Dig log line (api and worker stdout)",
+  "type": "object",
+  "required": ["time", "level", "service", "env", "msg"],
+  "properties": {
+    "time": { "type": "string", "format": "date-time" },
+    "level": { "enum": ["fatal", "error", "warn", "info", "debug", "trace"] },
+    "service": { "enum": ["riviera-api", "riviera-worker"] },
+    "env": { "type": "string", "minLength": 1 },
+    "msg": { "type": "string", "maxLength": 8205 },
+    "trace_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "span_id": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "request_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "job_id": { "type": "string", "format": "uuid" },
+    "job_name": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{0,63}$" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "staff_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "err": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "stack": { "type": "string" }
+      }
+    }
+  },
+  "dependentRequired": {
+    "span_id": ["trace_id"],
+    "job_name": ["job_id"],
+    "attempt": ["job_id"]
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["email"] },
+      { "required": ["authorization"] },
+      { "required": ["cookie"] },
+      { "required": ["password"] }
+    ]
+  }
+}
