@@ -40,7 +40,7 @@ need it, split that change into its own PR.
 
 **Purpose**: the two new workspaces exist and the SLO registry makes `ci/slo-check.ts` real.
 
-- [ ] T001 Scaffold `packages/telemetry` (`@riviera/telemetry`) and `apps/mocks` (`@riviera/mocks`): `package.json` each, `tsconfig.json` each (protected), `knip.json` workspace entries (protected), `ci/scope.json` `entrypoints` += `apps/mocks/src/main.ts`, `packages/telemetry/src/dashboards/write.ts` (protected; the PR states that these thin entrypoints are thereby excluded from coverage, a possible loosening for Antn to judge); install the exact OpenTelemetry versions from plan.md Technical Context plus `fast-check` and `yaml` (dev); `docker/api.Dockerfile` copies the telemetry package. Implement the registry `packages/telemetry/src/slo-metrics.ts` per data-model.md §3 (`InstrumentDef.name`, `.kind`, `.unit`, `.labels`, `.buckets`, `.slo`) with every instrument in contracts/telemetry.md#metrics and `SLO_METRIC_NAMES` derived from it, no runtime imports. Tests `packages/telemetry/test/slo-metrics.test.ts`: names equal `requiredMetrics(ci/slo-catalog.json)`; bucket at each latency threshold; no forbidden label names; each instrument, once recorded, reaches an in-memory OTLP metric exporter. **FR-014, FR-018** · `needs-human` · ~300 lines
+- [ ] T001 Scaffold `packages/telemetry` (`@riviera/telemetry`) and `apps/mocks` (`@riviera/mocks`): `package.json` each, `tsconfig.json` each (protected), `knip.json` workspace entries (protected), `ci/scope.json` `entrypoints` += `apps/mocks/src/main.ts`, `packages/telemetry/src/dashboards/write.ts` (protected; the PR states that these thin entrypoints are thereby excluded from coverage, a possible loosening for Antn to judge); install the exact OpenTelemetry versions from plan.md Technical Context plus `fast-check` and `yaml` (dev); `docker/api.Dockerfile` copies the telemetry package. Implement the registry `packages/telemetry/src/slo-metrics.ts` per data-model.md §3 (`InstrumentDef.name`, `.kind`, `.unit`, `.labels`, `.buckets`, `.slo`) with every instrument in contracts/telemetry.md#metrics and `SLO_METRIC_NAMES` derived from it, no runtime imports. Tests `packages/telemetry/test/slo-metrics.test.ts`: names equal `requiredMetrics(ci/slo-catalog.json)`; bucket at each latency threshold; no forbidden label names; each instrument of the real startup registry, once recorded, reaches an in-memory OTLP metric exporter (see "What exported means" below). **FR-014, FR-018** · `needs-human` · ~300 lines
 
 **Checkpoint**: `node ci/slo-check.ts` reports all catalog metrics registered (SC-004).
 
@@ -48,8 +48,12 @@ need it, split that change into its own PR.
 meter, so it is registered and exportable from the first export cycle. The OpenTelemetry SDK sends
 no data points for an instrument nothing has recorded yet, and this feature deliberately emits no
 zero values, because FR-025 requires an SLO dashboard to say "No data recorded yet" until real data
-exists. T001's export test therefore records one value per instrument in a test meter and checks it
-reaches the in-memory exporter, and R14 step 1 expects the SLO panels to be empty.
+exists. T001's export test therefore builds the **real startup registry** (the same `createInstruments`
+call the api and worker make at startup) on a meter provider with an in-memory reader, records one
+value through each of those instruments, and checks every catalog name reaches the exporter; R14
+step 1 expects the SLO panels to be empty until then. This reading of FR-014 next to FR-025 is
+listed in the PR for Antn's confirmation; if he wants it in the spec, it becomes a one-line
+clarification in a spec PR, not a plan change.
 
 ---
 
@@ -121,7 +125,7 @@ recorded yet" until data exists.
 empty, then filled).
 
 - [ ] T020 [US3] Dashboard builders `packages/telemetry/src/dashboards/build.ts` (panel/stat/timeseries helpers, OTel→Prometheus name translation per R7 with unit tests, `noValue: "No data recorded yet"`) and the thin CLI `packages/telemetry/src/dashboards/write.ts` (`make dashboards`); generate `observability/grafana/dashboards/overview.json`: request rate, errors and latency per route; job runs, failures and queue depth (`max by (job_name)`); Common Ground and Discogs calls by outcome. Tests `packages/telemetry/test/dashboards-overview.test.ts`: panels present, every query names only registered metrics, committed JSON equals generator output. Depends on T003, T015. **FR-026** · ~330 lines (generated JSON excluded)
-- [ ] T021 [US3] SLO dashboards: `packages/telemetry/src/dashboards/slo-queries.ts` (per data-model.md §4 `SloDashboard.id`, `.objectives`, `.budget`, `.noData`; SLIs of contracts/telemetry.md#slis over 28 days) and generation of `observability/grafana/dashboards/slo/<id>.json` (UID `slo-<id>`, title = catalog `name`, target, SLI, remaining budget, graph). Tests `packages/telemetry/test/dashboards-slo.test.ts`: ids equal catalog ids (exactly seven), every queried metric is in that SLO's catalog `metrics`, every stat panel has the no-data text, budget formula on worked examples, including the 100%-target rule (count 0 → 100%, count ≥ 1 → 0%, never NaN or ±Inf), committed JSON equals generator output. Depends on T020. **FR-024, FR-025** · ~350 lines (generated JSON excluded)
+- [ ] T021 [US3] SLO dashboards: `packages/telemetry/src/dashboards/slo-queries.ts` (per data-model.md §4 `SloDashboard.id`, `.objectives`, `.budget`, `.noData`; SLIs of contracts/telemetry.md#slis over 28 days) and generation of `observability/grafana/dashboards/slo/<id>.json` (UID `slo-<id>`, title = catalog `name`, target, SLI, remaining budget, graph). Tests `packages/telemetry/test/dashboards-slo.test.ts`: ids equal catalog ids (exactly seven), every queried metric is in that SLO's catalog `metrics`, every stat panel has the no-data text, budget formula on worked examples, including the 100%-target rule (count 0 → 100%, count ≥ 1 → 0%, never NaN or ±Inf) and its data rule (paid checkouts but no `paid_after_mismatch` series → 100%, not "No data"; neither series → "No data recorded yet"), committed JSON equals generator output. Depends on T020. **FR-024, FR-025** · ~350 lines (generated JSON excluded)
 
 **Checkpoint**: Grafana shows the "SLOs" folder with seven dashboards and the overview (SC-003).
 
