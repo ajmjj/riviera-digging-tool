@@ -406,9 +406,10 @@ describe("001/FR-009: the poll loop", () => {
           maxInFlight = Math.max(maxInFlight, inFlight);
           // The first heartbeat stalls past the end of the attempt; any later one would be fast.
           await sleep(calls === 1 ? 100 : 1);
+          const owned = await queue.heartbeat(id, attempt);
           inFlight -= 1;
           order.push("heartbeat");
-          return queue.heartbeat(id, attempt);
+          return owned;
         },
         complete: (id, attempt, traceParent) => {
           order.push("complete");
@@ -435,6 +436,26 @@ describe("001/FR-009: the poll loop", () => {
     const { id } = await queue.enqueue(NAME, PAYLOAD);
     const once = worker.runOnce();
     await until(() => started);
+    await worker.stop();
+    expect(await row(id)).toMatchObject({ status: "succeeded" });
+    expect(await once).toBe(true);
+  });
+
+  it("001/FR-009: stop() during a runOnce() claim still waits for the claimed attempt", async () => {
+    let claiming = false;
+    const worker = runner(() => sleep(30), {
+      queue: {
+        ...queue,
+        claim: async () => {
+          claiming = true;
+          await sleep(30);
+          return queue.claim();
+        },
+      },
+    });
+    const { id } = await queue.enqueue(NAME, PAYLOAD);
+    const once = worker.runOnce();
+    await until(() => claiming);
     await worker.stop();
     expect(await row(id)).toMatchObject({ status: "succeeded" });
     expect(await once).toBe(true);

@@ -109,7 +109,7 @@ export function createRunner(options: RunnerOptions): Runner {
   let loop: Promise<void> | undefined;
   let stopping = false;
   // Attempts still running, from the poll loop or a direct `runOnce()`; `stop()` waits for them.
-  const running = new Set<Promise<void>>();
+  const running = new Set<Promise<boolean>>();
 
   const attempt = async (job: ClaimedJob): Promise<void> => {
     const origin = spanContextOf(job.originTraceparent);
@@ -204,19 +204,24 @@ export function createRunner(options: RunnerOptions): Runner {
     });
   };
 
-  const runOnce = async (): Promise<boolean> => {
+  const claimAndRun = async (): Promise<boolean> => {
     const job = await queue.claim();
     if (job === undefined) {
       return false;
     }
-    const run = attempt(job);
+    await attempt(job);
+    return true;
+  };
+
+  // Tracked from the claim on, so a stop() during the claim still waits for the attempt.
+  const runOnce = async (): Promise<boolean> => {
+    const run = claimAndRun();
     running.add(run);
     try {
-      await run;
+      return await run;
     } finally {
       running.delete(run);
     }
-    return true;
   };
 
   const poll = async (): Promise<void> => {
