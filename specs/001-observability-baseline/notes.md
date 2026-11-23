@@ -9,11 +9,6 @@ description of the task it names, and that PR either acts on it or says why not.
   header allow-list and record no bodies. (T004 records no exporter error bodies; the header
   allow-list belongs to the logger's request serialiser.)
 
-## T006 / T013
-
-- Name a dev-only Common Ground credential variable for the mock's `Authorization` header. It is
-  redacted and never sent to the browser.
-
 ## Spec follow-up (its own spec PR, not a task)
 
 - 001/FR-005 should say that secret words match whole words of a field name, plus the
