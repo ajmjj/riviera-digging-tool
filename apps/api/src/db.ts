@@ -104,9 +104,14 @@ export function databaseFromPool(pool: Pool): Database {
   };
 }
 
-export function createDatabase(connectionString: string): Database {
+/** The process's pool; the queue uses it directly, everything else through `Database`. */
+export function createPool(connectionString: string): pg.Pool {
   const pool = new pg.Pool({ connectionString, max: 5, connectionTimeoutMillis: 2_000 });
   // An idle client error must not crash the process; readiness reports it instead.
   pool.on("error", () => undefined);
-  return databaseFromPool(pool);
+  return pool;
+}
+
+export function createDatabase(connectionString: string): Database {
+  return databaseFromPool(createPool(connectionString));
 }

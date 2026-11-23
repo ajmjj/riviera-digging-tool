@@ -30,7 +30,7 @@ export class Secret {
   }
 }
 
-type SampleFlows =
+export type SampleFlows =
   | { readonly enabled: false }
   | {
       readonly enabled: true;

@@ -129,13 +129,18 @@ export function createExternalClient(options: ExternalClientOptions): ExternalCl
       span.end();
 
       // Telemetry never fails the call (001/FR-020): a recorder error goes to diag, whose
-      // warnings the export guard rate-limits, and the call's own result stands.
+      // warnings the export guard rate-limits, and the call's own result stands. Each recorder
+      // has its own try, so one that throws doesn't cost the other its point.
       const labels = { service, operation, outcome: result.outcome };
       try {
         options.instruments.add("riviera.external.calls", 1, labels);
+      } catch {
+        diag.warn(`${name}: riviera.external.calls not recorded`);
+      }
+      try {
         options.instruments.record("riviera.external.duration", seconds, labels);
       } catch {
-        diag.warn(`${name}: external call metrics not recorded`);
+        diag.warn(`${name}: riviera.external.duration not recorded`);
       }
 
       if (result.outcome === "success") {

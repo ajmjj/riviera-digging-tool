@@ -15,8 +15,10 @@ down: ## Stop the stack (keeps the database volume)
 # Research R9: only these targets set the OTLP endpoint, so the plain stack never warns about
 # dropped telemetry. Research R17: only `up-dev` (and CI) turns the sample flows and mocks on.
 OTLP_ENDPOINT := OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+# The mock accepts any Authorization, so the dev key is a fixed placeholder, never a real key.
 SAMPLE_FLOWS := SAMPLE_FLOWS_ENABLED=true DEPLOYMENT_ENVIRONMENT=development \
-	COMMON_GROUND_URL=http://mocks:4000 DISCOGS_URL=http://mocks:4000
+	COMMON_GROUND_URL=http://mocks:4000 DISCOGS_URL=http://mocks:4000 \
+	COMMON_GROUND_DEV_API_KEY=dev-only-mock-key
 
 up-observability: env ## Start the stack with the observability profile, exporting telemetry
 	$(OTLP_ENDPOINT) docker compose --profile observability up --build --detach --wait --wait-timeout 120
