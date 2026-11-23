@@ -50,8 +50,31 @@ describe("001/FR-029: startup (real Postgres)", () => {
       await vi.waitFor(() => {
         expect(started.app.server.listening).toBe(false);
       });
+      // Once: the listeners are gone and a later stop() returns the same shutdown.
+      expect(signals.listenerCount(signal)).toBe(0);
+      expect(started.stop()).toBe(started.stop());
       await started.stop();
     }
+  });
+
+  it("001/FR-029: the database pool closes even when closing the server fails", async () => {
+    const started = await startService(config("api"), new EventEmitter());
+    expect((await started.app.inject("/readyz")).statusCode).toBe(200);
+    const poolConnections = async (): Promise<unknown> =>
+      (
+        await db.query(
+          "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND query = 'SELECT 1'",
+        )
+      ).rows[0];
+    expect(await poolConnections()).toEqual({ n: 1 });
+
+    const close = started.app.close.bind(started.app);
+    vi.spyOn(started.app, "close").mockRejectedValueOnce(new Error("close failed"));
+    await expect(started.stop()).rejects.toThrow("close failed");
+    await vi.waitFor(async () => {
+      expect(await poolConnections()).toEqual({ n: 0 });
+    });
+    await close();
   });
 
   it("001/FR-029: a failed listen (port taken) rejects instead of leaving a half-started service", async () => {
