@@ -67,23 +67,44 @@ const EMAIL =
 const BEARER = /\bBearer\s+(?!Bearer\b)[A-Za-z0-9\-._~+/]{8,}=*/gi;
 // Basic credentials (scheme in any case): only redacted when the base64 decodes to `user:pass`.
 const BASIC = /\bBasic\s+(?!Basic\b)([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])/gi;
-// `name=value` after a query, list or whitespace separator: `?token=…`, `&code=…`,
-// `Discogs token=…`, `key=…, secret=…`.
-const PARAM = /(^|[?&;,\s])([\w.-]{1,128})=([^\s&#,;"'<>]+)/g;
+// `name=` after a query, list, whitespace or `=` separator: `?token=…`, `&code=…`,
+// `Discogs token=…`, `key=…, secret=…`, and nested ones such as `next=/login?token=…`.
+const PARAM_NAME = /(?<=^|[?&;,\s=])[\w.-]{1,128}=/g;
+const PARAM_VALUE_END = /[\s&#,;"'<>]/g;
 
 /** Redacts emails, bearer/basic credentials and secret-named parameters in free text. */
 export function redactText(text: string): string {
-  return text
+  const redacted = text
     .replace(EMAIL, REDACTED)
     .replace(BEARER, REDACTED)
     .replace(BASIC, (match: string, encoded: string) =>
       Buffer.from(encoded, "base64").toString("utf8").includes(":") ? REDACTED : match,
-    )
-    .replace(PARAM, (match: string, separator: string, name: string) =>
-      isSecretName(name) || SECRET_PARAM_NAMES.has(name.toLowerCase())
-        ? `${separator}${name}=${REDACTED}`
-        : match,
     );
+  return redactParams(redacted);
+}
+
+// Scans for `name=`; a secret's value is replaced up to its end, while the value of any other
+// name is scanned on, so a secret parameter nested inside it is still found. Linear: every
+// character is passed at most once by the scan and once by a skipped secret value.
+function redactParams(text: string): string {
+  const names = new RegExp(PARAM_NAME);
+  let output = "";
+  let copied = 0;
+  for (let match = names.exec(text); match !== null; match = names.exec(text)) {
+    const name = match[0].slice(0, -1);
+    if (!isSecretName(name) && !SECRET_PARAM_NAMES.has(name.toLowerCase())) {
+      continue;
+    }
+    const start = match.index + match[0].length;
+    PARAM_VALUE_END.lastIndex = start;
+    const end = PARAM_VALUE_END.exec(text)?.index ?? text.length;
+    if (end > start) {
+      output += text.slice(copied, start) + REDACTED;
+      copied = end;
+      names.lastIndex = end;
+    }
+  }
+  return output + text.slice(copied);
 }
 
 /**

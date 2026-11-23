@@ -26,10 +26,14 @@ const plantedBasic = fc.tuple(userPart, tokenPart).map(([user, pass]): Planted =
 });
 const plantedQuery = fc
   .tuple(fc.constantFrom("token", "access_token", "key", "code", "client_secret"), tokenPart)
-  .map(([name, t]): Planted => ({
-    text: `https://shop.example/callback?page=2&${name}=${t}&lang=en`,
-    secret: t,
-  }));
+  .chain(([name, t]) =>
+    fc.constantFrom<Planted>(
+      { text: `https://shop.example/callback?page=2&${name}=${t}&lang=en`, secret: t },
+      // nested inside another parameter's value, as logfmt messages write it
+      { text: `next=/login?${name}=${t}`, secret: t },
+      { text: `a=b=${name}=${t}`, secret: t },
+    ),
+  );
 
 const planted = fc.oneof(plantedEmail, plantedBearer, plantedDiscogs, plantedBasic, plantedQuery);
 
@@ -164,6 +168,8 @@ describe("redaction of free text", () => {
       `Discogs key=${REDACTED}, secret=${REDACTED}`,
     );
     expect(redactText(`/cb?code=${token}&state=7`)).toBe(`/cb?code=${REDACTED}&state=7`);
+    expect(redactText(`url=/callback?code=${token}`)).toBe(`url=/callback?code=${REDACTED}`);
+    expect(redactText(`token= key=${token}`)).toBe(`token= key=${REDACTED}`);
   });
 
   it("001/FR-005: leaves look-alikes that carry no secret unchanged", () => {
