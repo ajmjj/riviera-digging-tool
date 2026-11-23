@@ -60,9 +60,16 @@ export function reviewerPrompt(): string {
 The constitution, the spec documents and the pull request are in the file ${INPUT_PATH}. Read all of it with the Read tool, in several reads if it is long, before you answer. Do not use any other tool. Return your review as the structured output.`;
 }
 
-/** The structured-output schema passed to Claude with --json-schema. */
+/**
+ * The structured-output schema passed to Claude Code with --json-schema. Claude Code's
+ * validator rejects the draft 2020-12 `$schema` marker Zod adds by default, so this is a
+ * draft-07 schema with the marker removed.
+ */
 export function reviewJsonSchema(): string {
-  return JSON.stringify(z.toJSONSchema(ReviewSchema));
+  const schema = z.toJSONSchema(ReviewSchema, { target: "draft-7" });
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(schema).filter(([k]) => k !== "$schema")),
+  );
 }
 
 /** A review with one blocking finding, used whenever the reviewer can't give a real one. */
