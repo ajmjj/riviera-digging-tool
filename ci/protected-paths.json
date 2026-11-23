@@ -1,0 +1,25 @@
+{
+  "$comment": "Protected. Changes to any matching path need Antn's approval (human-gate check). CODEOWNERS must list exactly these patterns; a unit test keeps the two in sync.",
+  "owner": "ajmjj",
+  "paths": [
+    ".github/**",
+    "ci/**",
+    "CODEOWNERS",
+    "CLAUDE.md",
+    ".specify/**",
+    ".claude/**",
+    "contracts/**",
+    "eslint.config.js",
+    "**/tsconfig*.json",
+    "vitest.config.ts",
+    "stryker.config.mjs",
+    "playwright.config.ts",
+    "knip.json",
+    "codegen.ts",
+    ".prettierrc.json",
+    ".prettierignore",
+    ".npmrc",
+    ".gitleaks.toml",
+    ".semgrepignore"
+  ]
+}

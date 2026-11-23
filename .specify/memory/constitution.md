@@ -1,24 +1,8 @@
-<!--
-Sync Impact Report
-- Version change: (template) → 1.0.0
-- Basis: docs/constitution-input.md (binding input), docs/digging-tool-handoff.md,
-  docs/checkout-api-findings.md
-- Principles added: I–VIII (all new)
-- Sections added: Quality Gates (CI Pipeline), Human Checkpoints, Governance
-- Removed sections: none
-- Deferred:
-  - TODO(BACKSTOCK_OBSERVABILITY): Principle VII still has to adopt Backstock's logging,
-    metrics, tracing, dashboard, alerting and SLO rules without changing them (only
-    names adapted). Antn will paste them into the session. The minimums already in VII
-    apply in the meantime.
-  - TODO(RATIFICATION_DATE): set when Antn approves this constitution (Human Checkpoint 1).
-- Templates: plan/spec/tasks templates read this file at runtime. No template edits needed.
--->
 # Riviera Dig Constitution
 
 This codebase is written entirely by AI agents and is **not reviewed line by line by a
 human**. Every rule below exists so that a green CI run can stand in for code review.
-"Antn" means the project owner, who is the sole CODEOWNER.
+"Antn" means the project owner (GitHub `@ajmjj`), who is the sole CODEOWNER.
 
 ## Core Principles
 
@@ -26,29 +10,41 @@ human**. Every rule below exists so that a green CI run can stand in for code re
 
 - `main` MUST only change through a pull request whose required checks are all green.
 - Direct pushes, force-pushes and bypassing protection are forbidden for everyone, admins
-  included.
+  included. The repository ruleset has no bypass actors.
 - A change is "done" only when every required check on its PR is green. Local green runs
   count for nothing.
+- Every required check MUST run on every PR. A check that does not apply yet (for example,
+  visual regression before there are screens) MUST still run and pass trivially, saying in
+  its output why, so it can't be dropped quietly later.
 
 Rationale: with no human reading the code, the pipeline is the reviewer. Anything that can
 skip it makes every other rule optional.
 
 ### II. Agents Never Weaken the Safety Net (NON-NEGOTIABLE)
 
-- Changes to any of the following MUST be approved by Antn through CODEOWNERS:
+- **Protected paths.** Changes to any of the following MUST be approved by Antn (see
+  Human Checkpoints for how approval is given and verified):
   - `.github/`, `ci/`, `CODEOWNERS`
-  - test, coverage, diff-coverage and mutation thresholds
-  - formatter, lint, type-checker and security-scanner configuration
+  - test, coverage, diff-coverage and mutation thresholds (`ci/thresholds.json`)
+  - formatter, lint, type-checker, test-runner and security-scanner configuration
   - this constitution (`.specify/memory/constitution.md`)
-- CI MUST fail any PR that adds any of the following, unless the PR carries the
-  `approved-exception` label, which only Antn may apply:
-  - skipped, focused or placeholder tests (`skip`, `only`, `todo`, `xit`, `fit`,
-    `pytest.mark.skip`, and the like)
-  - `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `# type: ignore`, `noqa`
+
+  The authoritative list is `ci/protected-paths.json`, which is itself protected.
+- **Suppression guard.** CI MUST fail any PR that adds any of the following, unless Antn
+  has applied the `approved-exception` label:
+  - skipped, focused or placeholder tests (`.skip`, `.only`, `.todo`, `xit`, `fit`,
+    `describe.skip`, `test.fixme`, and the like)
+  - `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck`, `# type: ignore`,
+    `noqa`, `istanbul ignore`, `c8 ignore`, `v8 ignore`, `Stryker disable`
   - `--no-verify`
   - any lowered threshold
-- Agents MUST NOT change the branch-protection rules. Antn applies them himself with the
-  committed script.
+- **Labels.** Agents MUST apply `needs-human` to every PR that touches a protected path,
+  asks for an exception, or writes to Common Ground for real.
+- The gate checks (suppression guard, human gate, independent review) MUST run from the
+  base branch's workflow definitions (`pull_request_target`) and MUST NOT execute code
+  from the PR, so a PR can't rewrite the rules that judge it.
+- Agents MUST NOT change the repository ruleset. Antn applies it himself with
+  `ci/branch-protection.sh`.
 
 Rationale: an agent under pressure to get to green will otherwise loosen the gate instead
 of fixing the code.
@@ -59,9 +55,10 @@ of fixing the code.
   /speckit-tasks → /speckit-implement`. Code with no spec requirement behind it MUST be
   rejected.
 - Every functional requirement (`FR-###`) in `specs/**/spec.md` MUST be named by at least
-  one test (for example `it("FR-012: …")`).
-- A CI script MUST fail the build if any FR has no test, or if any test names an FR that
-  does not exist.
+  one test. Because FR numbers restart in every spec, tests name them with the feature
+  number in front: `NNN/FR-###`, for example `it("002/FR-012: …")`.
+- CI MUST fail the build if any FR has no test, or if any test names an FR that does not
+  exist.
 
 Rationale: traceability is how a reader with no time to read the code can still check that
 every requirement is exercised and nothing unasked-for was built.
@@ -83,7 +80,7 @@ anything. Mutation and property tests catch that. Coverage alone does not.
 ### V. Small, Self-Describing PRs
 
 - One task, or a small group of related tasks, per PR.
-- At most about 400 changed lines, not counting generated files and fixtures.
+- At most about 400 changed lines, not counting generated files, lockfiles and fixtures.
 - Each PR description MUST list the tasks (`T###`) and FRs it covers.
 
 Rationale: small PRs keep the independent reviewer agent effective and make failures easy
@@ -102,33 +99,51 @@ to locate and revert.
 Rationale: one wrong write to the shop's point of sale costs real money and can't be
 undone from this tool.
 
-### VII. Observability by Default
+### VII. Every Feature Ships With Its Traces, Metrics and Logs
 
-> TODO(BACKSTOCK_OBSERVABILITY): adopt Backstock's logging, metrics, tracing, dashboard,
-> alerting and SLO rules here without changing them, adapting only the names. Until then
-> the minimums below are binding, and they stay binding afterwards wherever Backstock is
-> silent.
+This principle adopts the Backstock project's observability setup unchanged, adapting
+only the names.
 
-- **Logs:** structured JSON to stdout, with a request ID and a correlation ID on every
-  line. Logs MUST NOT contain personal data or secrets. CI MUST test the redaction.
-- **Traces:** OpenTelemetry traces for every HTTP request, every background job and every
-  outbound call to Common Ground or Discogs.
-- **Metrics**, at minimum:
-  - sync duration and outcome
-  - Common Ground and Discogs calls, both total and rate-limited (HTTP 429)
-  - job queue depth and job failures
-  - verdicts per minute
-  - staff checkouts started, succeeded and failed, and total mismatches
-- **Local stack:** an observability stack in `docker compose`, behind a profile flag, with
-  dashboards provisioned up front.
-- **Health endpoints:** `/healthz` (the process is alive) and `/readyz` (the database is
-  reachable and the last sync is recent).
-- **Tested:** tests MUST assert that key flows emit their logs, metrics and traces. For
-  example, a sync run produces a span tree, a metrics update and a structured log line with
-  a correlation ID.
+**Stack (identical to Backstock)**
+- Instrumentation: OpenTelemetry for TypeScript/Node, covering traces, metrics and logs.
+- Pipeline: app → OpenTelemetry Collector → Grafana stack: Loki for logs, Tempo for
+  traces, Prometheus/Mimir for metrics.
+- SLOs are defined as OpenTelemetry metrics, with one Grafana dashboard per SLO.
+- Local stack via Docker Compose in the repo, behind a compose profile, with dashboards
+  pre-provisioned.
 
-Rationale: the tool runs unattended on a home machine behind a tunnel. When something goes
-wrong, telemetry is the only witness.
+**Context.** Riviera Dig has a single shop, so where Backstock carries tenant context we
+carry `staff_id` (pseudonymous, never the email address) plus the request ID or job ID.
+
+**Minimums on top of Backstock**
+- Logs: structured JSON, with no personal data or secrets. CI tests the redaction.
+- Traces: spans on every HTTP request, every background job, and every outbound call to
+  Common Ground or Discogs.
+- Metrics: Common Ground and Discogs calls (total, failed, rate-limited 429), queue depth,
+  job failures, staff checkout total mismatches.
+- Health endpoints: `/healthz` (process alive) and `/readyz` (database reachable, last
+  sync recent).
+- CI checks that every SLO metric below exists and is exported.
+- Tests assert that key flows emit their logs, metrics and traces. For example, a sync run
+  produces a span tree, a metrics update and a structured log line with a correlation ID.
+
+**Initial SLOs**, measured only while the host machine is running:
+
+| SLO | Target |
+|---|---|
+| Verdict saved | ≥ 99.9% of verdict requests succeed; p95 latency < 300 ms |
+| Next record ready | p95 < 500 ms to return the next record with its audio source |
+| Inventory freshness | Nightly full sync succeeds within 26 h of the previous one, 99% of the time (missed runs caught up when the host starts) |
+| Sold-record removal | A record sold in Common Ground leaves every pile within 20 min, 99% of the time |
+| Staff checkout correctness | 100% of checkouts marked paid had zero total mismatch; ≥ 99% of started checkouts complete or stop safely |
+| Audio resolvable | ≥ 95% of records that have an audio source resolve to something playable |
+| Notification delivery | ≥ 99% of push notifications sent within 5 min of their trigger (outside quiet hours) |
+
+The machine-readable SLO catalog is `ci/slo-catalog.json` (protected). It MUST match this
+table.
+
+Rationale: the tool runs unattended on a home machine. When something goes wrong,
+telemetry is the only witness.
 
 ### VIII. Product Invariants Never Break
 
@@ -152,19 +167,45 @@ Each of these MUST be covered by tests:
 
 Rationale: these are the rules the shop's money and the staff's trust depend on.
 
+## Technology Stack and Delivery Order
+
+**Stack**
+- TypeScript throughout: a Node backend (`api`) and worker (same image, different
+  command), plus the PWA (`web`). Postgres. Everything runs with `docker compose up`.
+- pnpm workspaces with a committed lockfile and `--frozen-lockfile` installs. Exact
+  dependency versions only.
+- Prettier, ESLint (typescript-eslint strict type-checked preset) with zero warnings,
+  `tsc --strict` with no implicit `any` and no unchecked casts, knip for dead code and
+  unused dependencies.
+- Vitest (unit and integration), Stryker (mutation), fast-check (property-based),
+  Playwright with axe (end-to-end, accessibility, visual regression).
+- Typed Common Ground clients are generated with GraphQL Code Generator from the schemas
+  in `contracts/common-ground/`, so any operation that doesn't match the schema fails the
+  build. Generated code is committed and CI fails if it is stale.
+- The public URL is the `.env` setting `APP_URL`. The Cloudflare Tunnel is added once Antn
+  has chosen the domain.
+
+**Delivery order**
+1. Foundation: repo, Spec Kit, constitution, CI, local Docker Compose and a hosting
+   target. Deployable locally with `docker compose up` from the first PR.
+2. `001` Observability baseline, before any business feature.
+3. `002` Auth: magic link, invite only, roles admin and staff, Antn as the only admin.
+   Strict TDD starts here.
+4. Then the build order in `docs/digging-tool-handoff.md` section 11, starting with the
+   Common Ground sync.
+
 ## Quality Gates (CI Pipeline)
 
-Every check below is required on every PR, including Dependabot or Renovate PRs. A check
-that does not apply yet (for example, before there is a frontend) MUST still run and pass
-trivially, so it can't be dropped quietly later.
+Every check below is required on every PR, including dependency-update PRs. Thresholds
+live in `ci/thresholds.json`.
 
 **Static**
-- Formatter check, and a linter at its strictest preset with zero warnings allowed.
-- Strict type checking: no implicit `any` and no unchecked casts (`mypy --strict` or
-  pyright strict if Python is used).
-- Lockfile committed, frozen installs (`--frozen-lockfile` or equivalent), no floating
-  dependency versions.
+- Formatter check, and the strict linter with zero warnings.
+- Strict type checking.
+- Frozen lockfile install, no floating dependency versions.
 - Dead-code and unused-dependency check.
+- Generated Common Ground clients are up to date and every operation validates against
+  the schemas.
 - The suppression and threshold guard from Principle II.
 - The FR traceability check from Principle III.
 
@@ -175,14 +216,10 @@ trivially, so it can't be dropped quietly later.
 - Property-based tests for the staff price rule (never above list, never below €5 unless
   list is lower, the 50%/30% boundary at exactly €20, rounding to the cent), dig ordering
   and undo.
-- Integration tests against real Postgres (Testcontainers or a compose service): every
-  migration runs up and down, the seed loads, and every repository query is exercised.
-- Contract tests:
-  - every Common Ground GraphQL operation is validated against the committed Admin and
-    Client schemas in `contracts/common-ground/`, failing on any mismatch
-  - typed clients are generated from those schemas
-  - Discogs and Common Ground mocks use recorded fixtures that are checked against the same
-    contracts
+- Integration tests against real Postgres: every migration runs up and down, the seed
+  loads, and every repository query is exercised.
+- Contract tests: Discogs and Common Ground mocks use recorded fixtures that are checked
+  against the same contracts as the generated clients.
 - End-to-end tests with Playwright against the full `docker compose` stack with mocked
   external APIs:
   - every user flow on the design canvas, at 390×844 and 1440×900
@@ -194,13 +231,14 @@ trivially, so it can't be dropped quietly later.
 - Every Docker image builds.
 - `docker compose up` reaches all-green healthchecks within 120 seconds.
 - A smoke test covers sign-in, digging a record, adding it to the pile, pulling it, and a
-  staff checkout in dry-run mode.
+  staff checkout in dry-run mode (each step joins the smoke test as its feature lands).
 - Trivy image scan, failing on high or critical issues.
 
 **Security**
 - gitleaks on the diff and on the full history.
 - Dependency audit plus SAST (CodeQL and Semgrep), failing on high or critical findings.
-- GitHub Actions pinned to commit SHAs, with minimal `permissions:` on every workflow.
+- GitHub Actions pinned to commit SHAs, and third-party tools pinned to exact versions with
+  verified checksums. Minimal `permissions:` on every workflow.
 - Dependency-update PRs go through the same pipeline. Auto-merge is allowed only for patch
   updates, and only when everything is green.
 - Authentication security tests: magic-link expiry and single use, session fixation, CSRF
@@ -208,7 +246,7 @@ trivially, so it can't be dropped quietly later.
 - Data isolation tests as in Principle VIII.
 
 **Observability**
-- The emission tests from Principle VII.
+- SLO metric existence and export check, and the emission tests from Principle VII.
 
 **Independent review**
 - A separate reviewer agent runs on every PR in CI, with a fresh context and none of the
@@ -224,24 +262,32 @@ Antn does not review code, but these approvals are required and can't be skipped
 
 1. This constitution, and every amendment to it.
 2. Each feature's `spec.md`, after `/speckit-clarify` and before `/speckit-plan`.
-3. Any PR labelled `needs-human`. Agents MUST apply that label to any PR that touches a
-   CODEOWNERS path, asks for an exception, or writes to Common Ground for real.
+3. Any PR labelled `needs-human`.
 4. Turning on the live Common Ground write flag, and only after the spikes in the handoff
    brief (section 10) have passed.
+
+**How approval is given.** Agents open PRs through Antn's own GitHub account, and GitHub
+does not let an author approve their own PR. So approval is the `human-approved` label
+(and, for exceptions, `approved-exception`), applied by Antn himself in the GitHub web UI
+or with his own `gh` login, after the PR's last commit. The `human-gate` check verifies
+that each such label was applied by `@ajmjj` and not through any GitHub App, and every new
+commit removes `human-approved`. Agents MUST NOT apply, remove or ask an app to apply
+either label.
 
 ## Governance
 
 - This constitution overrides every other practice, plan, task list and agent instruction
   in this repository. Where a plan or task conflicts with it, the constitution wins and the
   plan MUST be corrected.
-- **Amendments:** by PR only, labelled `needs-human`, approved by Antn through CODEOWNERS.
-  Each amendment states what changed, why, and what code or CI has to follow.
+- **Amendments:** by PR only, labelled `needs-human`, approved by Antn as described in
+  Human Checkpoints. Each amendment states what changed, why, and what code or CI has to
+  follow.
 - **Versioning:** semantic versioning. MAJOR for removing or redefining a principle or
   gate, MINOR for a new principle or materially stronger rule, PATCH for wording only.
-  Loosening any gate is at least MINOR and always needs Human Checkpoint 1.
+  Loosening any check is always at least MINOR and always needs Antn's approval.
 - **Compliance:** `/speckit-plan` MUST include a constitution check. The reviewer agent
   checks every PR against this document. Any deviation needs either an amendment or an
   `approved-exception` label from Antn, recorded in the PR.
 - Runtime guidance for agents lives in `CLAUDE.md`, and it MUST NOT contradict this file.
 
-**Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): set on Antn's approval | **Last Amended**: 2026-11-23
+**Version**: 1.0.0 | **Ratified**: PENDING (set to the approval date when Antn approves the first PR) | **Last Amended**: 2026-11-23

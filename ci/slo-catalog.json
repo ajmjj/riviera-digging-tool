@@ -1,0 +1,54 @@
+{
+  "$comment": "Protected. Machine-readable form of the SLO table in the constitution (Principle VII). Metric names are proposals; 001 (observability baseline) may rename them with Antn's approval. ci/slo-check.ts fails if any metric here is missing from the telemetry registry once it exists.",
+  "registry": "packages/telemetry/src/slo-metrics.ts",
+  "slos": [
+    {
+      "id": "verdict-saved",
+      "name": "Verdict saved",
+      "objective": ">= 99.9% of verdict requests succeed; p95 latency < 300 ms",
+      "metrics": ["riviera.verdict.requests", "riviera.verdict.duration"]
+    },
+    {
+      "id": "next-record-ready",
+      "name": "Next record ready",
+      "objective": "p95 < 500 ms to return the next record with its audio source",
+      "metrics": ["riviera.dig.next_record.duration"]
+    },
+    {
+      "id": "inventory-freshness",
+      "name": "Inventory freshness",
+      "objective": "Nightly full sync succeeds within 26 h of the previous one, 99% of the time",
+      "metrics": ["riviera.sync.runs", "riviera.sync.duration", "riviera.sync.last_success"]
+    },
+    {
+      "id": "sold-record-removal",
+      "name": "Sold-record removal",
+      "objective": "A record sold in Common Ground leaves every pile within 20 min, 99% of the time",
+      "metrics": ["riviera.pile.sold_removal.delay"]
+    },
+    {
+      "id": "staff-checkout-correctness",
+      "name": "Staff checkout correctness",
+      "objective": "100% of checkouts marked paid had zero total mismatch; >= 99% of started checkouts complete or stop safely",
+      "metrics": [
+        "riviera.checkout.started",
+        "riviera.checkout.finished",
+        "riviera.checkout.mismatches",
+        "riviera.checkout.paid_after_mismatch"
+      ]
+    },
+    {
+      "id": "audio-resolvable",
+      "name": "Audio resolvable",
+      "objective": ">= 95% of records that have an audio source resolve to something playable",
+      "metrics": ["riviera.audio.resolutions"]
+    },
+    {
+      "id": "notification-delivery",
+      "name": "Notification delivery",
+      "objective": ">= 99% of push notifications sent within 5 min of their trigger (outside quiet hours)",
+      "metrics": ["riviera.notification.delivery.delay"]
+    }
+  ],
+  "minimumMetrics": ["riviera.external.calls", "riviera.queue.depth", "riviera.jobs.failures"]
+}

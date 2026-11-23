@@ -1,0 +1,11 @@
+{
+  "$comment": "Protected (constitution, Principle II). The suppression guard fails any PR that lowers a number here or removes a key, unless Antn applies approved-exception.",
+  "coverage": {
+    "overall": { "branches": 90, "lines": 90, "functions": 90, "statements": 90 },
+    "domain": { "branches": 95, "lines": 95, "functions": 95, "statements": 95 }
+  },
+  "diffCoverage": { "domain": 100, "other": 90 },
+  "mutation": { "break": 80 },
+  "flakeRepeats": 3,
+  "composeStartupSeconds": 120
+}

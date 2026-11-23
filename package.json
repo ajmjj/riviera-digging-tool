@@ -1,0 +1,46 @@
+{
+  "name": "riviera-dig",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "node ci/typecheck.ts",
+    "knip": "knip",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:coverage": "vitest run --coverage",
+    "fr-trace": "node ci/fr-trace.ts",
+    "mutation": "node ci/mutation.ts",
+    "e2e": "playwright test",
+    "check": "pnpm format && pnpm lint && pnpm typecheck && pnpm knip && pnpm fr-trace && pnpm test:coverage"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "1.12.0",
+    "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
+    "@graphql-codegen/cli": "8.0.0",
+    "@graphql-codegen/typescript": "7.0.1",
+    "@graphql-codegen/typescript-operations": "7.0.2",
+    "@playwright/test": "1.65.1",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
+    "@types/node": "26.6.6",
+    "@vitest/coverage-v8": "5.1.1",
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "graphql": "17.1.0",
+    "knip": "6.48.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0",
+    "vitest": "5.1.1",
+    "zod": "4.6.7"
+  }
+}

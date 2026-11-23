@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["ci/*.ts", "e2e/**/*.spec.ts"],
+      "project": ["ci/**/*.ts", "e2e/**/*.ts", "*.ts"]
+    },
+    "apps/api": {
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "apps/web": {
+      "entry": ["index.html"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/common-ground": {
+      "project": ["src/**/*.ts"]
+    }
+  }
+}
