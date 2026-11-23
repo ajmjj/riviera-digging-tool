@@ -176,7 +176,7 @@ describe("001/FR-013: mock URLs only", () => {
 
   it.each([
     ["https://api-admin.common-ground.io/graphql"],
-    ["https://riviera.common-ground.io/graphql"],
+    ["https://riviera-records.common-ground.io/graphql"],
     ["https://common-ground.io"],
     ["http://API-ADMIN.Common-Ground.IO.:443/graphql"],
   ])("001/FR-013: refuses Common Ground URL %s", (url) => {

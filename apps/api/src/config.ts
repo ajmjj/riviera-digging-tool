@@ -119,7 +119,7 @@ function isLocalIpv4(host: string): boolean {
 /**
  * The sample flows may only reach the local mocks (research R16, FR-013). The real hosts are
  * refused by name: discogs.com and common-ground.io (the Admin API at api-admin.common-ground.io,
- * each shop's Client API at <shop>.common-ground.io), with their subdomains. As a backstop every
+ * the Client API at riviera-records.common-ground.io), with their subdomains. As a backstop every
  * other public host is refused too: a mock URL must be a single-label name (the compose service
  * `mocks`), localhost, or a loopback or private address.
  */
