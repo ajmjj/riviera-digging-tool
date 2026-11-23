@@ -72,6 +72,8 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
     parameters named like secrets (`?token=…`, `&key=…`, `&code=…`) → `"[REDACTED]"`.
   - Request headers are never logged except an allow-list (`user-agent`, `content-type`,
     `x-request-id`); `authorization` and `cookie` would be redacted anyway.
+  - Order: redaction runs first, truncation last, so replacing a value with `[REDACTED]` can't
+    push a string back over the limit.
   - `truncate(value)`: strings over 8192 UTF-8 bytes are cut at a character boundary and
     suffixed with `…[truncated]` (FR-006).
 - Applied to: log message and fields (R3), span attributes, span event attributes, span
@@ -140,7 +142,8 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
 - **Healthchecks**: Grafana and Prometheus images have `wget`. The collector image is
   distroless and core has no `health_check` extension, and Loki/Tempo images may lack a
   shell. Where an image has no probe tool, a two-line derived image in `docker/` copies a
-  static `busybox` in (`COPY --from=busybox:musl …`) so the healthcheck can
+  static `busybox` in (`COPY --from=busybox:<tag>-musl@sha256:<digest> …`, pinned by tag and
+  digest like every other image) so the healthcheck can
   `busybox wget --spider` the service's own readiness URL (collector: its internal telemetry
   endpoint on :8888; Loki and Tempo: `/ready`). T014 verifies per image and only adds the
   derived image where needed.
@@ -190,7 +193,10 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
   expired, i.e. whose worker crashed: the crashed attempt counts as one failed attempt
   (`riviera.jobs.runs{outcome="failed"}` and `riviera.jobs.failures` +1, `last_error =
   'lease expired'`), and the job goes back to `queued` if `attempt < max_attempts`, else to
-  `failed`. So a crashed `max_attempts = 1` job is never run a second time.
+  `failed`. So a crashed `max_attempts = 1` job is never run a second time. `heartbeat`,
+  `complete` and `fail` all take the attempt number and only act while `id`, `attempt` and
+  `status = 'running'` still match, so a stalled worker that lost its lease can't overwrite the
+  next attempt.
 - **Rationale**: the minimum FR-029 asks for, and the shape the Common Ground rate-limited
   queue (sync feature) can extend with a rate limiter and schedules.
 - **Alternatives**: pg-boss / graphile-worker (bigger than needed, own schemas and
@@ -304,7 +310,10 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
   observation of a new histogram series may be missed by `increase()`. With many observations
   this is noise; T014 also turns on Prometheus's created-timestamp zero ingestion for OTLP if the
   pinned version supports it, and documents what it found. `riviera.sync.last_success` is never
-  zero-initialised (0 would read as 1970).
+  zero-initialised (0 would read as 1970). So for these instruments the plan deviates from a
+  literal reading of FR-014 ("exported at startup"): they are registered at startup and exported
+  from their first observation. This deviation is recorded in the plan PR and needs Antn's
+  `approved-exception` there (Governance), or a spec clarification if he prefers.
 - **Alternatives**: rely on Prometheus created-timestamp ingestion alone (version-dependent,
   and not verifiable until T014); PromQL workarounds such as `or` on the raw series (complex
   and easy to get wrong per panel).
