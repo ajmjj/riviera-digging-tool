@@ -10,6 +10,9 @@ updates:
         update-types: [patch]
   - package-ecosystem: github-actions
     directories: [/, /.github/actions/setup]
+    # These bumps always change .github/, a protected path. Setting labels replaces
+    # Dependabot's defaults, so the default two are listed too.
+    labels: [dependencies, github_actions, needs-human]
     schedule:
       interval: weekly
   - package-ecosystem: docker

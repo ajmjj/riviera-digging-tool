@@ -1,7 +1,20 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 
 export interface HealthDeps {
   readonly pingDatabase: () => Promise<void>;
+}
+
+const HEALTHZ = "/healthz";
+const READYZ = "/readyz";
+const HEALTH_ROUTES: ReadonlySet<string> = new Set([HEALTHZ, READYZ]);
+
+/**
+ * 001/FR-007: healthchecks write no per-request lines (the app turns Fastify's request logging
+ * off for these), while a failing check still writes its own warn line.
+ */
+export function isHealthRequest(request: FastifyRequest): boolean {
+  const route = request.routeOptions.url;
+  return route !== undefined && HEALTH_ROUTES.has(route);
 }
 
 /**
@@ -10,13 +23,14 @@ export interface HealthDeps {
  * when the Common Ground sync lands.
  */
 export function registerHealthRoutes(app: FastifyInstance, deps: HealthDeps): void {
-  app.get("/healthz", () => ({ status: "ok" }));
+  app.get(HEALTHZ, () => ({ status: "ok" }));
 
-  app.get("/readyz", async (_request, reply) => {
+  app.get(READYZ, async (request, reply) => {
     try {
       await deps.pingDatabase();
       return { status: "ready", checks: { database: "ok" } };
-    } catch {
+    } catch (error) {
+      request.log.warn({ err: error, check: "database" }, "readiness check failed");
       return reply.code(503).send({ status: "not_ready", checks: { database: "unreachable" } });
     }
   });
