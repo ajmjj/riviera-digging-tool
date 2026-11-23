@@ -1,30 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parse } from "yaml";
+import { isRecord, readYaml, record, strings, type Yaml } from "./yaml.ts";
 
-// Static checks of docker-compose.yml and the collector config (tasks T014, research R7–R10, R17).
+// Static checks of docker-compose.yml and the collector config (tasks T014, T015, research R7–R10, R17).
 // `make up-observability` and the CI stack job prove the same stack actually comes up healthy.
-
-type Yaml = Readonly<Record<string, unknown>>;
-
-function isRecord(value: unknown): value is Yaml {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function record(value: unknown, what: string): Yaml {
-  if (!isRecord(value)) {
-    throw new Error(`${what} is not a mapping`);
-  }
-  return value;
-}
-
-function strings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
-}
-
-function readYaml(path: string): Yaml {
-  return record(parse(readFileSync(path, "utf8"), { merge: true }), path);
-}
 
 const compose = readYaml("docker-compose.yml");
 const services = record(compose["services"], "services");
@@ -32,7 +11,7 @@ const serviceNames = Object.keys(services);
 const service = (name: string): Yaml => record(services[name], `service ${name}`);
 const profilesOf = (name: string): string[] => strings(service(name)["profiles"]);
 
-const OBSERVABILITY = ["otel-collector", "loki", "tempo", "prometheus"];
+const OBSERVABILITY = ["otel-collector", "loki", "tempo", "prometheus", "grafana"];
 const APP_SERVICES = ["db", "api", "worker", "web", "proxy"];
 
 function dependsOn(name: string): string[] {

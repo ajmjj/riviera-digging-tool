@@ -225,8 +225,42 @@ services:
       retries: 20
       start_period: 5s
 
+  # Data sources and dashboard folders are provisioned (001/FR-022); anonymous visitors are
+  # Viewers. The admin password comes only from .env: an empty GRAFANA_ADMIN_PASSWORD stops this
+  # service (and only this one) instead of falling back to Grafana's default password.
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'test -n "$$GF_SECURITY_ADMIN_PASSWORD" || { echo "GRAFANA_ADMIN_PASSWORD is not set in .env" >&2; exit 1; }; exec /run.sh'
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3300}:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
 volumes:
   pgdata:
   loki-data:
   tempo-data:
   prometheus-data:
+  grafana-data:

@@ -38,3 +38,10 @@ description of the task it names, and that PR either acts on it or says why not.
   R18); `observe()` reports only what its callback passes to `report`, so T017 fills in the zeros.
 - `@opentelemetry/sdk-metrics` is a dev dependency so far (only the T003 tests import it); T004
   moves it to `dependencies` when `sdk.ts` imports it.
+
+## T024 (from T014 / T015)
+
+- R11: `docker compose --profile dev --profile observability config --images` lists the locally
+  built derived images (`riviera-dig/otel-collector:local`, `riviera-dig/loki:local`,
+  `riviera-dig/tempo:local`). The Trivy step must scan them after the build, not try to pull
+  them, so the upstream images inside them (and the copied busybox) are covered.

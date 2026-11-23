@@ -1,0 +1,68 @@
+# Grafana data sources, provisioned at start so nothing is set up by hand (001/FR-022).
+# The uids are fixed: the generated dashboards (T020, T021) and ci/obs-check.ts query them.
+# Grafana expands $VAR in provisioning files, so Grafana's own ${__…} variables are written $${…}.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+
+  # Logs → traces: the OTLP `trace_id` is Loki structured metadata, matched by name.
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        - name: trace_id
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: $${__value.raw}
+          urlDisplayLabel: Open trace
+
+  # Traces → logs by trace ID, traces → the request and job metrics of the span's service.
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{service_name=~".+"} | trace_id="$${__trace.traceId}"'
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        tags:
+          - key: service.name
+            value: service_name
+        queries:
+          - name: Request rate by route
+            query: sum by (route) (rate(riviera_http_server_duration_seconds_count{$$__tags}[5m]))
+          - name: Request p95 latency by route
+            query: histogram_quantile(0.95, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket{$$__tags}[5m])))
+          - name: Job runs by outcome
+            query: sum by (job_name, outcome) (rate(riviera_jobs_runs_total{$$__tags}[5m]))
+          - name: Job p95 duration
+            query: histogram_quantile(0.95, sum by (job_name, le) (rate(riviera_jobs_duration_seconds_bucket{$$__tags}[5m])))
+      lokiSearch:
+        datasourceUid: loki
+      nodeGraph:
+        enabled: true
