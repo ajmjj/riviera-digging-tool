@@ -99,6 +99,8 @@ describe("redaction of planted values (property)", () => {
     (w) => w.join("-"), // kebab-case
     (w) => w.join("_").toUpperCase(), // UPPER_CASE
     (w) => w.map(cap).join("-"), // Header-Case
+    (w) => w.join(""), // joined lower case
+    (w) => w.join("").toUpperCase(), // JOINED UPPER CASE
   ];
   const secretName = fc
     .tuple(fc.constantFrom(...SECRET_NAMES), fc.constantFrom(...styles))
@@ -135,7 +137,7 @@ describe("whole-word matching of secret names (research R4)", () => {
   it("001/FR-005: the spec's example names are secret; keyboard and monkey stay unredacted", () => {
     const secret =
       "adminKey admin_key Admin-Key ADMIN_KEY commonGroundAdminKey privateKey accessKey";
-    const more = "X-Api-Key CLIENT_SECRET accesstoken clientsecret apikey APIKey apiKey2";
+    const more = "X-Api-Key CLIENT_SECRET accesstoken clientsecret apikey APIKey apiKey2 ADMINKEY";
     for (const name of `${secret} ${more}`.split(" ")) {
       expect({ name, secret: isSecretName(name) }).toEqual({ name, secret: true });
     }
@@ -156,6 +158,7 @@ describe("redaction of free text", () => {
     expect(redactText(`Authorization: Bearer ${token}`)).toBe(`Authorization: ${REDACTED}`);
     expect(redactText(`Bearer Bearer ${token}`)).toBe(`Bearer ${REDACTED}`);
     expect(redactText(`Basic ${basic}`)).toBe(REDACTED);
+    expect(redactText(`authorization: basic ${basic}`)).toBe(`authorization: ${REDACTED}`);
     expect(redactText(`Discogs token=${token}`)).toBe(`Discogs token=${REDACTED}`);
     expect(redactText(`Discogs key=${token}, secret=${token}`)).toBe(
       `Discogs key=${REDACTED}, secret=${REDACTED}`,
@@ -164,7 +167,8 @@ describe("redaction of free text", () => {
   });
 
   it("001/FR-005: leaves look-alikes that carry no secret unchanged", () => {
-    const texts = "Basic validation failed|status_code=500 page=2|GET /x?sort=price&page=3|a@b";
+    const texts =
+      "Basic validation failed|the bearer of news|status_code=500|GET /x?sort=a&page=3|a@b";
     for (const text of texts.split("|")) {
       expect(redactText(text)).toBe(text);
     }
@@ -225,6 +229,18 @@ describe("structure", () => {
       { name: "a", self: "[Circular]" },
       { name: "a", self: "[Circular]" },
     ]);
+  });
+});
+
+describe("redaction cost", () => {
+  it("001/FR-005: stays linear on large values with no match, so a big log value can't stall (US5)", () => {
+    const size = 256 * 1024;
+    for (const text of ["a".repeat(size), "a=".repeat(size / 2), `?${"a".repeat(size)}`]) {
+      const started = performance.now();
+      expect(redactText(text)).toBe(text);
+      // Quadratic matching took tens of seconds at this size; linear takes well under 100 ms.
+      expect(performance.now() - started).toBeLessThan(2000);
+    }
   });
 });
 

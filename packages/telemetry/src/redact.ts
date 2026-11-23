@@ -15,6 +15,14 @@ const SECRET_WORDS: ReadonlySet<string> = new Set(
 // R4: …or when the unsplit name contains one of these (`accesstoken`, `clientsecret`).
 const SECRET_SUBSTRINGS: readonly string[] = ["password", "secret", "token"];
 
+// FR-005: names that differ only by separators match too, so the run-together spellings of
+// common compound secret names are secret (`ADMINKEY`, `privatekey`, `setcookie`). Matched as
+// substrings of the name with separators removed; none occurs in `keyboard` or `monkey`.
+const SECRET_COMPOUNDS: readonly string[] = (
+  "adminkey apikey accesskey privatekey secretkey signingkey encryptionkey masterkey clientkey " +
+  "sharedkey sessionkey sessionid authkey authheader setcookie passwd credential authorization"
+).split(" ");
+
 // R4: query or `name=value` parameters that carry secrets without a secret word in the name.
 const SECRET_PARAM_NAMES: ReadonlySet<string> = new Set(["code"]);
 
@@ -36,25 +44,32 @@ export function splitWords(name: string): string[] {
 
 /**
  * Whether a field name names a secret. Secret words match whole words of the name (research
- * R4), so `adminKey` and `ADMIN_KEY` are secret while `keyboard` and `monkey` are not.
+ * R4), so `adminKey` and `ADMIN_KEY` are secret while `keyboard` and `monkey` are not; the
+ * compounds above also catch the same names written without separators (`ADMINKEY`).
  */
 export function isSecretName(name: string): boolean {
-  const lower = name.toLowerCase();
+  const joined = name.toLowerCase().replace(/[^a-z0-9]/g, "");
   return (
     splitWords(name).some((word) => SECRET_WORDS.has(word)) ||
-    SECRET_SUBSTRINGS.some((part) => lower.includes(part))
+    SECRET_SUBSTRINGS.some((part) => joined.includes(part)) ||
+    SECRET_COMPOUNDS.some((part) => joined.includes(part))
   );
 }
 
+// Every pattern is linear in the input: quantifiers that could rescan the text from each start
+// position are bounded (RFC 5321 limits for emails), so a large untruncated value can't stall
+// the event loop (US5) before truncation runs.
 // Dot-atom email addresses, with any atext character in the local part.
-const EMAIL = /[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
-// RFC 6750 bearer tokens. The look-ahead keeps "Bearer Bearer <token>" from hiding the token.
-const BEARER = /\bBearer\s+(?!Bearer\b)[A-Za-z0-9\-._~+/]+=*/gi;
-// Basic credentials: only redacted when the base64 decodes to `user:password`.
-const BASIC = /\bBasic\s+(?!Basic\b)([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])/g;
+const EMAIL =
+  /[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}/g;
+// RFC 6750 bearer tokens of 8+ characters, so prose like "the bearer of" keeps its words. The
+// look-ahead keeps "Bearer Bearer <token>" from hiding the token.
+const BEARER = /\bBearer\s+(?!Bearer\b)[A-Za-z0-9\-._~+/]{8,}=*/gi;
+// Basic credentials (scheme in any case): only redacted when the base64 decodes to `user:pass`.
+const BASIC = /\bBasic\s+(?!Basic\b)([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])/gi;
 // `name=value` after a query, list or whitespace separator: `?token=…`, `&code=…`,
 // `Discogs token=…`, `key=…, secret=…`.
-const PARAM = /(^|[?&;,\s])([\w.-]+)=([^\s&#,;"'<>]+)/g;
+const PARAM = /(^|[?&;,\s])([\w.-]{1,128})=([^\s&#,;"'<>]+)/g;
 
 /** Redacts emails, bearer/basic credentials and secret-named parameters in free text. */
 export function redactText(text: string): string {
