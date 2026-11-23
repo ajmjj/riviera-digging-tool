@@ -6,21 +6,11 @@ import { truncate } from "./truncate.ts";
 export const REDACTED = "[REDACTED]";
 
 // R4: a field name is secret when one of its words is one of these.
-const SECRET_WORDS: ReadonlySet<string> = new Set([
-  "password",
-  "passwd",
-  "pass",
-  "secret",
-  "token",
-  "key",
-  "apikey",
-  "auth",
-  "authorization",
-  "cookie",
-  "session",
-  "credential",
-  "credentials",
-]);
+const SECRET_WORDS: ReadonlySet<string> = new Set(
+  "password passwd pass secret token key apikey auth authorization cookie session credential credentials".split(
+    " ",
+  ),
+);
 
 // R4: …or when the unsplit name contains one of these (`accesstoken`, `clientsecret`).
 const SECRET_SUBSTRINGS: readonly string[] = ["password", "secret", "token"];

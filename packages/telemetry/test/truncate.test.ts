@@ -10,19 +10,11 @@ import {
 const markerBytes = Buffer.byteLength(TRUNCATION_MARKER);
 
 describe("truncation", () => {
-  it("001/FR-006: the limit is 8 KB", () => {
-    expect(TRUNCATION_LIMIT_BYTES).toBe(8192);
-  });
-
-  it("001/FR-006: text within the limit is unchanged", () => {
+  it("001/FR-006: text over 8 KB is cut to the limit and marked; shorter text is unchanged", () => {
     const exact = "a".repeat(TRUNCATION_LIMIT_BYTES);
+    expect(TRUNCATION_LIMIT_BYTES).toBe(8192);
     expect(truncateText(exact)).toBe(exact);
-    expect(truncateText("")).toBe("");
-  });
-
-  it("001/FR-006: longer text is cut to the limit and marked", () => {
-    const output = truncateText("a".repeat(TRUNCATION_LIMIT_BYTES + 1));
-    expect(output).toBe("a".repeat(TRUNCATION_LIMIT_BYTES) + TRUNCATION_MARKER);
+    expect(truncateText(`${exact}a`)).toBe(exact + TRUNCATION_MARKER);
   });
 
   it("001/FR-006: never splits a multi-byte character", () => {

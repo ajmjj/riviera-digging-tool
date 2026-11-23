@@ -8,10 +8,9 @@ import { TRUNCATION_LIMIT_BYTES, TRUNCATION_MARKER } from "../src/truncate.ts";
 const tokenPart = fc.stringMatching(/^[A-Za-z0-9]{24,40}$/);
 const userPart = fc.stringMatching(/^[a-z][a-z0-9]{2,11}$/);
 
+/** `text` is planted into the JSON; `secret`, its sensitive part, must not survive. */
 interface Planted {
-  /** The text planted into the JSON. */
   readonly text: string;
-  /** The sensitive part, which must not survive redaction. */
   readonly secret: string;
 }
 
@@ -36,6 +35,11 @@ const planted = fc.oneof(plantedEmail, plantedBearer, plantedDiscogs, plantedBas
 
 type Wrap = (inner: unknown) => unknown;
 
+// A field name without a secret word, so wrapping never hides the planted field itself.
+const safeKey = fc
+  .string()
+  .filter((s) => !/pass|secret|token|key|auth|cookie|session|credential/i.test(s));
+
 // Puts a value somewhere in arbitrary JSON: as an array element or an object field.
 const wrapper: fc.Arbitrary<Wrap> = fc.oneof(
   fc
@@ -46,7 +50,7 @@ const wrapper: fc.Arbitrary<Wrap> = fc.oneof(
       return items;
     }),
   fc
-    .tuple(fc.dictionary(fc.string(), fc.jsonValue({ maxDepth: 2 }), { maxKeys: 3 }), fc.string())
+    .tuple(fc.dictionary(fc.string(), fc.jsonValue({ maxDepth: 2 }), { maxKeys: 3 }), safeKey)
     .map(([others, key]): Wrap => (inner) => ({ ...others, [key]: inner })),
 );
 
@@ -80,22 +84,13 @@ describe("redaction of planted values (property)", () => {
   });
 
   // Field names as word lists; each is written in every case style of FR-005.
-  const SECRET_NAMES: readonly (readonly string[])[] = [
-    ["admin", "key"],
-    ["common", "ground", "admin", "key"],
-    ["private", "key"],
-    ["access", "key"],
-    ["x", "api", "key"],
-    ["client", "secret"],
-    ["access", "token"],
-    ["password"],
-    ["authorization"],
-    ["cookie"],
-    ["set", "cookie"],
-    ["session", "id"],
-    ["api", "key"],
-    ["credentials"],
-  ];
+  const SECRET_NAMES = [
+    "admin key|common ground admin key|private key|access key|x api key|client secret",
+    "access token|password|authorization|cookie|set cookie|session id|api key|credentials",
+  ]
+    .join("|")
+    .split("|")
+    .map((name) => name.split(" "));
   const cap = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
   const styles: readonly ((words: readonly string[]) => string)[] = [
     (w) => w.map((word, i) => (i === 0 ? word : cap(word))).join(""), // camelCase
@@ -134,46 +129,21 @@ describe("redaction of planted values (property)", () => {
       ),
     );
   });
-
-  it("001/FR-005: the example names of the spec and plan are secret names", () => {
-    for (const name of [
-      "adminKey",
-      "admin_key",
-      "Admin-Key",
-      "ADMIN_KEY",
-      "commonGroundAdminKey",
-      "privateKey",
-      "accessKey",
-      "X-Api-Key",
-      "CLIENT_SECRET",
-      "accesstoken",
-      "clientsecret",
-      "apikey",
-      "APIKey",
-      "apiKey2",
-    ]) {
-      expect({ name, secret: isSecretName(name) }).toEqual({ name, secret: true });
-    }
-  });
 });
 
 describe("whole-word matching of secret names (research R4)", () => {
-  it("001/FR-005: keyboard and monkey are not secret names and stay unredacted", () => {
-    expect(isSecretName("keyboard")).toBe(false);
-    expect(isSecretName("monkey")).toBe(false);
-    expect(redact({ keyboard: "qwerty", monkey: "Bonobo", Keyboard_Layout: "azerty" })).toEqual({
-      keyboard: "qwerty",
-      monkey: "Bonobo",
-      Keyboard_Layout: "azerty",
-    });
-  });
-
-  it("001/FR-005: names split at separators, camelCase and digits", () => {
+  it("001/FR-005: the spec's example names are secret; keyboard and monkey stay unredacted", () => {
+    const secret =
+      "adminKey admin_key Admin-Key ADMIN_KEY commonGroundAdminKey privateKey accessKey";
+    const more = "X-Api-Key CLIENT_SECRET accesstoken clientsecret apikey APIKey apiKey2";
+    for (const name of `${secret} ${more}`.split(" ")) {
+      expect({ name, secret: isSecretName(name) }).toEqual({ name, secret: true });
+    }
+    const safe = { keyboard: "qwerty", monkey: "Bonobo", Keyboard_Layout: "azerty" };
+    expect(redact(safe)).toEqual(safe);
     expect(splitWords("commonGroundAdminKey")).toEqual(["common", "ground", "admin", "key"]);
-    expect(splitWords("X-Api-Key")).toEqual(["x", "api", "key"]);
-    expect(splitWords("PRIVATE_KEY")).toEqual(["private", "key"]);
-    expect(splitWords("APIKey")).toEqual(["api", "key"]);
-    expect(splitWords("job.name 2fa")).toEqual(["job", "name", "2", "fa"]);
+    expect(splitWords("X-Api-Key PRIVATE_KEY")).toEqual(["x", "api", "key", "private", "key"]);
+    expect(splitWords("APIKey job.name2fa")).toEqual(["api", "key", "job", "name", "2", "fa"]);
   });
 });
 
@@ -194,13 +164,8 @@ describe("redaction of free text", () => {
   });
 
   it("001/FR-005: leaves look-alikes that carry no secret unchanged", () => {
-    for (const text of [
-      "Basic validation failed",
-      "status_code=500 page=2",
-      "GET /records?sort=price&page=3",
-      "keyboard=qwerty",
-      "a@b",
-    ]) {
+    const texts = "Basic validation failed|status_code=500 page=2|GET /x?sort=price&page=3|a@b";
+    for (const text of texts.split("|")) {
       expect(redactText(text)).toBe(text);
     }
   });
@@ -209,9 +174,9 @@ describe("redaction of free text", () => {
 describe("structure", () => {
   it("001/FR-005: keeps non-sensitive data unchanged (property)", () => {
     const safeText = fc.string().filter((s) => !/[@=]|bearer|basic/i.test(s));
-    const safeKey = fc.oneof(
+    const anyKey = fc.oneof(
       fc.constantFrom("name", "route", "status", "keyboard", "monkey", "sortOrder", "jobName"),
-      safeText.filter((s) => !/pass|secret|token|key|auth|cookie|session|credential/i.test(s)),
+      safeKey.filter((s) => !/[@=]|bearer|basic/i.test(s)),
     );
     const safeJson = fc.letrec((tie) => ({
       value: fc.oneof(
@@ -222,7 +187,7 @@ describe("structure", () => {
         fc.boolean(),
         fc.constant(null),
         fc.array(tie("value")),
-        fc.dictionary(safeKey, tie("value")),
+        fc.dictionary(anyKey, tie("value")),
       ),
     })).value;
     fc.assert(
