@@ -93,6 +93,21 @@ describe("createGitHub", () => {
     );
     await expect(gh.send("PATCH", "/m", {})).rejects.toThrow("GitHub PATCH");
   });
+
+  it("adds GitHub's message and the permissions it wanted to the error", async () => {
+    const { fetchFn } = recordingFetch(
+      () =>
+        new Response('{"message":"Resource not accessible by integration"}', {
+          status: 403,
+          headers: { "x-accepted-github-permissions": "issues=write; pull_requests=write" },
+        }),
+    );
+    const gh = createGitHub("t", "o/r", fetchFn);
+    await expect(gh.send("DELETE", "/labels/x")).rejects.toThrow(
+      "HTTP 403 (needs one of: issues=write; pull_requests=write): " +
+        '{"message":"Resource not accessible by integration"}',
+    );
+  });
 });
 
 describe("timeline and PR helpers", () => {

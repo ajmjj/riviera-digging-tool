@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write # removing a label from a PR may need this as well as issues: write
       issues: write # only to remove human-approved after a new commit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,9 +52,28 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           install: "false"
+      # Dependabot-triggered runs get a read-only github.token whatever `permissions` says, so
+      # removing a stale approval label would fail with 403. For PRs opened by Dependabot only,
+      # mint a short-lived GitHub App token (Issues: write, this repo only) on every run.
+      # The App's client ID and private key are Dependabot secrets. They are visible to CI jobs
+      # that run dependency code, so the App must have nothing else installed or permitted:
+      # human-gate rejects labels added through an App, so it can't forge Antn's approval.
+      - name: Mint label-removal token (Dependabot PRs only)
+        id: app
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        continue-on-error: true # secrets not set up yet: fall back to the read-only token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.GATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GATE_APP_PRIVATE_KEY }}
+          permission-issues: write
+      - name: Warn if the App token could not be minted
+        if: steps.app.outcome == 'failure'
+        run: echo "::warning::Could not mint the GATE_APP token; Dependabot PRs fall back to the read-only token."
       - name: Antn's approval for protected paths and needs-human
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          LABEL_REMOVAL_TOKEN: ${{ steps.app.outputs.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           EVENT_ACTION: ${{ github.event.action }}
         run: node ci/human-gate.ts

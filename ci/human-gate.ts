@@ -1,11 +1,15 @@
 // The `human-gate` check (constitution, Human Checkpoints). Runs under
 // `pull_request_target` from the base branch's code; reads the PR only through the API.
 // On every new commit it removes `human-approved`, so approval always covers the last commit.
-import { changedFilenames, labelNames, toLabelEvents } from "./lib/github.ts";
+import { changedFilenames, createGitHub, labelNames, toLabelEvents } from "./lib/github.ts";
 import { evaluateGate, LABELS } from "./lib/human-gate.ts";
 import { env, githubFromEnv, prop, readJson, stringList, summary } from "./io.ts";
 
 const gh = githubFromEnv();
+// Dependabot runs only get a read-only token. A separate App token (Issues: write) is used for
+// removing stale approvals and nothing else; everything the gate reads goes through `gh`.
+const removalToken = process.env["LABEL_REMOVAL_TOKEN"] ?? "";
+const remover = removalToken === "" ? gh : createGitHub(removalToken, gh.repo, fetch);
 const number = env("PR_NUMBER");
 const action = process.env["EVENT_ACTION"] ?? "";
 const config = readJson("ci/protected-paths.json");
@@ -17,7 +21,7 @@ let labels = labelNames(await gh.get(`/repos/${gh.repo}/issues/${number}`));
 if (action === "synchronize") {
   for (const label of [LABELS.approved, LABELS.exception]) {
     if (labels.includes(label)) {
-      await gh.send(
+      await remover.send(
         "DELETE",
         `/repos/${gh.repo}/issues/${number}/labels/${encodeURIComponent(label)}`,
       );
