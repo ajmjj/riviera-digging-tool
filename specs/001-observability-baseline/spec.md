@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-23
 
-**Status**: Approve
+**Status**: Approved
 
 **Input**: User description: "Read docs/digging-tool-handoff.md and the constitution. Specify the observability baseline before any business features exist: structured logs with staff and request/job context, distributed traces across HTTP requests and background jobs (including outbound calls to Common Ground and Discogs, mocked), metrics for every SLO in the constitution, a local OpenTelemetry Collector + Loki + Tempo + Prometheus + Grafana stack that developers can run with Docker Compose, and one dashboard per SLO. Acceptance: a sample request and a sample background job are both visible end to end as a trace in Grafana, with linked logs and metrics, and every SLO dashboard exists."
 
