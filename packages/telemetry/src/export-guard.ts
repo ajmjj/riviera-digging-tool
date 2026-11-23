@@ -170,14 +170,34 @@ export function guardSpanExporter(inner: SpanExporter, limiter: DropWarning): Sp
   };
 }
 
-/** Log records are redacted by the logger before they are bridged (T005); failures warn. */
+/** A copy of the log record whose event name, body and attributes are redacted. */
+function cleanLogRecord(record: ReadableLogRecord): ReadableLogRecord {
+  return {
+    hrTime: record.hrTime,
+    hrTimeObserved: record.hrTimeObserved,
+    ...(record.spanContext === undefined ? {} : { spanContext: record.spanContext }),
+    ...(record.severityText === undefined ? {} : { severityText: record.severityText }),
+    ...(record.severityNumber === undefined ? {} : { severityNumber: record.severityNumber }),
+    ...(record.body === undefined ? {} : { body: cleanValue(record.body) }),
+    ...(record.eventName === undefined ? {} : { eventName: cleanText(record.eventName) }),
+    resource: record.resource,
+    instrumentationScope: record.instrumentationScope,
+    attributes: cleanAttributes(record.attributes),
+    droppedAttributesCount: record.droppedAttributesCount,
+  };
+}
+
+/**
+ * The logger redacts every line before it is bridged (logger.ts); log records are redacted
+ * again here, so a record emitted any other way can't leak either. Failures warn.
+ */
 export function guardLogExporter(
   inner: LogRecordExporter,
   limiter: DropWarning,
 ): LogRecordExporter {
   return {
     export: guardExport("logs", limiter, (logs: ReadableLogRecord[], done) => {
-      inner.export(logs, done);
+      inner.export(logs.map(cleanLogRecord), done);
     }),
     shutdown: () => inner.shutdown(),
     forceFlush: () => inner.forceFlush(),
