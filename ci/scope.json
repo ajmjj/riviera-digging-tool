@@ -2,7 +2,12 @@
   "$comment": "Protected. Which files count as source, domain code, entrypoints and generated code. Coverage, diff coverage and mutation testing all read this file.",
   "source": ["apps/*/src/**/*.ts", "packages/*/src/**/*.ts", "ci/lib/**/*.ts"],
   "domain": ["apps/api/src/domain/**/*.ts", "packages/domain/src/**/*.ts"],
-  "entrypoints": ["apps/api/src/main.ts", "apps/web/src/main.ts"],
+  "entrypoints": [
+    "apps/api/src/main.ts",
+    "apps/web/src/main.ts",
+    "apps/mocks/src/main.ts",
+    "packages/telemetry/src/dashboards/write.ts"
+  ],
   "generated": ["packages/*/src/generated/**"],
   "typeOnly": ["packages/common-ground/src/index.ts"]
 }

@@ -8,12 +8,19 @@
     "apps/api": {
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
+    "apps/mocks": {
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
     "apps/web": {
       "entry": ["index.html"],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "packages/common-ground": {
       "project": ["src/**/*.ts"]
+    },
+    "packages/telemetry": {
+      "entry": ["src/dashboards/write.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
     }
   }
 }

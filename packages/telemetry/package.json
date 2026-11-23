@@ -1,0 +1,9 @@
+{
+  "name": "@riviera/telemetry",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./slo-metrics": "./src/slo-metrics.ts"
+  }
+}

@@ -4,8 +4,10 @@ import { execFileSync } from "node:child_process";
 const projects = [
   "tsconfig.json",
   "apps/api/tsconfig.json",
+  "apps/mocks/tsconfig.json",
   "apps/web/tsconfig.json",
   "packages/common-ground/tsconfig.json",
+  "packages/telemetry/tsconfig.json",
 ];
 
 for (const project of projects) {
