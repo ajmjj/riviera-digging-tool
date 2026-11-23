@@ -1,5 +1,5 @@
-// Redaction of personal data and secrets (spec FR-005, research R4). One implementation for
-// log lines (T005) and span data at export (T004); `sanitize` adds truncation (FR-006) last.
+// Redaction of personal data and secrets (spec 001/FR-005, research R4). One implementation for
+// log lines (T005) and span data at export (T004); `sanitize` adds truncation (001/FR-006) last.
 
 import { truncate } from "./truncate.ts";
 
@@ -15,13 +15,17 @@ const SECRET_WORDS: ReadonlySet<string> = new Set(
 // R4: …or when the unsplit name contains one of these (`accesstoken`, `clientsecret`).
 const SECRET_SUBSTRINGS: readonly string[] = ["password", "secret", "token"];
 
-// FR-005: names that differ only by separators match too, so the run-together spellings of
+// 001/FR-005: names that differ only by separators match too, so the run-together spellings of
 // common compound secret names are secret (`ADMINKEY`, `privatekey`, `setcookie`). Matched as
 // substrings of the name with separators removed; none occurs in `keyboard` or `monkey`.
 const SECRET_COMPOUNDS: readonly string[] = (
   "adminkey apikey accesskey privatekey secretkey signingkey encryptionkey masterkey clientkey " +
   "sharedkey sessionkey sessionid authkey authheader setcookie passwd credential authorization"
 ).split(" ");
+
+// An authorization value can hold several words (`Token …`, `Digest …`), so it is redacted to
+// the end of the line.
+const LINE_VALUE_NAMES: ReadonlySet<string> = new Set(["authorization", "proxyauthorization"]);
 
 // R4: query or `name=value` parameters that carry secrets without a secret word in the name.
 const SECRET_PARAM_NAMES: ReadonlySet<string> = new Set(["code"]);
@@ -72,8 +76,9 @@ const BASIC = /\bBasic\s+(?!Basic\b)([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])/gi;
 // `name=` or `name:` after a separator, the name optionally quoted: `?token=…`, `#code=…`,
 // `Discogs token=…`, `key=…, secret=…`, `password: …`, `{"token":"…"}`, and nested ones
 // such as `next=/login?token=…`.
-const PARAM_NAME = /(?<=^|[?&;,\s=#/:([{"'])(["']?)[\w.-]{1,128}\1\s?(?:=|:\s?)/g;
+const PARAM_NAME = /(?<=^|[?&;,\s=#/:([{"'])(["']?)[\w.-]{1,128}\1(?:=|\s=\s?|\s?:\s?)/g;
 const PARAM_VALUE_END = /[\s&#,;"'<>)\]}]/g;
+const LINE_END = /[\r\n]/g;
 
 /** Redacts emails, bearer/basic credentials and secret-named parameters in free text. */
 export function redactText(text: string): string {
@@ -104,7 +109,10 @@ function redactParams(text: string): string {
     }
     let end: number;
     const quote = text.charAt(start);
-    if (quote === '"' || quote === "'") {
+    if (LINE_VALUE_NAMES.has(name.toLowerCase().replace(/[^a-z]/g, ""))) {
+      LINE_END.lastIndex = start;
+      end = LINE_END.exec(text)?.index ?? text.length;
+    } else if (quote === '"' || quote === "'") {
       start += 1;
       end = closingQuote(text, quote, start);
     } else {

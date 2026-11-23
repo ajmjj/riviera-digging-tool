@@ -94,7 +94,7 @@ describe("redaction of planted values (property)", () => {
     );
   });
 
-  // Field names as word lists; each is written in every case style of FR-005.
+  // Field names as word lists; each is written in every case style of 001/FR-005.
   const SECRET_NAMES = [
     "admin key|common ground admin key|private key|access key|x api key|client secret",
     "access token|password|authorization|cookie|set cookie|session id|api key|credentials",
@@ -179,6 +179,13 @@ describe("redaction of free text", () => {
     expect(redactText(`token= key=${token}`)).toBe(`token= key=${REDACTED}`);
     expect(redactText(`{"token":"a\\"${token}","n":1}`)).toBe(`{"token":"${REDACTED}","n":1}`);
     expect(redactText(`password: "${token}`)).toBe(`password: "${REDACTED}`);
+    expect(redactText(`password = ${token} ok`)).toBe(`password = ${REDACTED} ok`);
+    expect(redactText(`Authorization: Token ${token} x\nnext`)).toBe(
+      `Authorization: ${REDACTED}\nnext`,
+    );
+    expect(redactText(`Proxy-Authorization: Digest response="${token}"`)).toBe(
+      `Proxy-Authorization: ${REDACTED}`,
+    );
     expect(redactText(`Error: not found`)).toBe(`Error: not found`);
   });
 
