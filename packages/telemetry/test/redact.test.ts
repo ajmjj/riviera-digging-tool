@@ -202,6 +202,12 @@ describe("redaction of free text", () => {
     );
   });
 
+  it("001/FR-005: a quoted JSON value with escaped quotes is redacted to its real closing quote", () => {
+    expect(
+      redactText(String.raw`{"authorization":"Digest username=\"u\", response=\"h\"","n":1}`),
+    ).toBe(`{"authorization":"${REDACTED}","n":1}`);
+  });
+
   it("001/FR-005: leaves look-alikes that carry no secret unchanged", () => {
     const texts =
       "Basic validation failed|the bearer of news|status_code=500|GET /x?sort=a&page=3|a@b";
