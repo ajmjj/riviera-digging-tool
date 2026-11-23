@@ -1,7 +1,6 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Config } from "../../src/config.ts";
-import { startService, type Service } from "../../src/startup.ts";
+import { startService, type Service, type ServiceConfig } from "../../src/startup.ts";
 import { freshDatabase, type FreshDatabase } from "./fresh-database.ts";
 
 let db: FreshDatabase;
@@ -17,13 +16,14 @@ afterEach(async () => {
   await db.drop();
 });
 
-function config(role: Config["role"]): Config {
+function config(role: ServiceConfig["role"]): ServiceConfig {
   return {
     role,
     port: 0,
     databaseUrl: db.url,
     appUrl: new URL("http://localhost"),
     logLevel: "silent",
+    telemetry: { environment: "ci" },
   };
 }
 
