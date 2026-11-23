@@ -46,6 +46,7 @@ describe("request ID (001/FR-003)", () => {
       headers: { "x-request-id": "req_A-1" },
     });
     expect(res.headers["x-request-id"]).toBe("req_A-1");
+    expect(lines().length).toBeGreaterThan(0);
     expect(lines().every((line) => line["request_id"] === "req_A-1")).toBe(true);
   });
 
