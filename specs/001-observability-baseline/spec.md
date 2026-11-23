@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-23
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "Read docs/digging-tool-handoff.md and the constitution. Specify the observability baseline before any business features exist: structured logs with staff and request/job context, distributed traces across HTTP requests and background jobs (including outbound calls to Common Ground and Discogs, mocked), metrics for every SLO in the constitution, a local OpenTelemetry Collector + Loki + Tempo + Prometheus + Grafana stack that developers can run with Docker Compose, and one dashboard per SLO. Acceptance: a sample request and a sample background job are both visible end to end as a trace in Grafana, with linked logs and metrics, and every SLO dashboard exists."
 
@@ -35,7 +35,7 @@ binding constraints, not as design choices.
 - Q: Should requests to the health endpoints also be left out of HTTP metrics and per-request logs, not only traces? → A: Yes: health requests produce no spans, no HTTP metric points and no per-request log lines; failures are still logged.
 - Q: Over what period should each SLO dashboard measure its current value and remaining error budget? → A: A rolling 28-day window; metrics are kept for at least 30 days.
 - Q: How should CI decide that a stopped collector doesn't slow requests? → A: p95 with the collector stopped ≤ the larger of 1.10 × p95 with it running, or p95 with it running + 5 ms.
-- Q: Must the observability images pass the same CI vulnerability scan as the app's own images? → A: Yes: a fixable high or critical issue in any image, observability included, fails the build.
+- Q: Must the observability images pass the same CI vulnerability scan as the app's own images? → A: Yes: the observability images go through the same image vulnerability scan as the app's images, with the same failure rule.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -269,8 +269,7 @@ stopped, and check that the smoke test passes and requests are not slowed notice
   Loki, Tempo, Prometheus and Grafana) in Docker Compose behind a profile named
   `observability`, off by default. Every service in it MUST have a healthcheck, bind only to
   127.0.0.1, and come up healthy within the constitution's 120-second startup limit. Its images
-  MUST pass the same image vulnerability scan as the app's images (no fixable high or critical
-  issues).
+  MUST pass the same image vulnerability scan as the app's images.
 - **FR-022**: Grafana MUST come pre-provisioned with its data sources and dashboards, with no
   manual setup, and MUST link traces to logs (by trace ID), logs to traces, and traces to the
   related request and job metrics.
