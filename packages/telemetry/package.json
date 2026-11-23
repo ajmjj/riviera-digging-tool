@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./instruments": "./src/instruments.ts",
+    "./redact": "./src/redact.ts",
     "./sdk": "./src/sdk.ts",
     "./slo-metrics": "./src/slo-metrics.ts",
     "./testing": "./src/testing.ts"
