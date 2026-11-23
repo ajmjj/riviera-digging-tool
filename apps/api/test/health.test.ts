@@ -10,7 +10,7 @@ afterEach(async () => {
 });
 
 function appWith(pingDatabase: () => Promise<void>): FastifyInstance {
-  app = buildApp({ logLevel: "silent", pingDatabase });
+  app = buildApp({ logger: { service: "riviera-api", env: "ci", level: "silent" }, pingDatabase });
   return app;
 }
 

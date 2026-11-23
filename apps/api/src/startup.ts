@@ -8,6 +8,9 @@ export interface SignalSource {
   once(event: "SIGTERM" | "SIGINT", listener: () => void): unknown;
 }
 
+/** The loaded config; the deployment environment labels every log line (001/FR-001). */
+export type ServiceConfig = Config & { readonly telemetry: { readonly environment: string } };
+
 export interface Service {
   readonly app: FastifyInstance;
   stop(): Promise<void>;
@@ -18,17 +21,25 @@ export interface Service {
  * makes that safe), then the HTTP app. SIGTERM and SIGINT stop it.
  */
 export async function startService(
-  config: Config,
+  config: ServiceConfig,
   signals: SignalSource,
   migrationsDir: URL = MIGRATIONS_DIR,
 ): Promise<Service> {
   const applied = await migrateUp(config.databaseUrl, await loadMigrations(migrationsDir));
   const db = createDatabase(config.databaseUrl);
-  const app = buildApp({ logLevel: config.logLevel, pingDatabase: () => db.ping() });
+  const app = buildApp({
+    logger: {
+      service: config.role === "api" ? "riviera-api" : "riviera-worker",
+      env: config.telemetry.environment,
+      level: config.logLevel,
+    },
+    pingDatabase: () => db.ping(),
+  });
 
   let stopping: Promise<void> | undefined;
   const stop = (): Promise<void> => {
-    stopping ??= app.close().then(() => db.close());
+    // The pool closes even if closing the server fails.
+    stopping ??= app.close().finally(() => db.close());
     return stopping;
   };
   signals.once("SIGTERM", () => void stop());
