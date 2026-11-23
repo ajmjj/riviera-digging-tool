@@ -112,6 +112,30 @@ services:
       retries: 20
       start_period: 3s
 
+  # Common Ground and Discogs mocks (contracts/mocks.md, 001/FR-013): development and CI only
+  # (profile `dev`, research R17), never on the plain stack. Not published; the api reaches it
+  # on the compose network at http://mocks:4000.
+  mocks:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: docker/mocks.Dockerfile
+    image: riviera-dig/mocks:local
+    restart: unless-stopped
+    environment:
+      PORT: "4000"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+
   # --- Profile `observability` (001/FR-021): research R7, R8, R10 ---
 
   otel-collector:

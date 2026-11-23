@@ -81,9 +81,14 @@ describe("compose profile observability", () => {
   });
 
   it("001/FR-021: every published port of every service binds to 127.0.0.1", () => {
-    const published = serviceNames.flatMap((name) => strings(service(name)["ports"]));
+    const published: unknown[] = serviceNames.flatMap((name) => {
+      const ports: unknown = service(name)["ports"];
+      return Array.isArray(ports) ? ports.map((port: unknown) => port) : [];
+    });
     expect(published.length).toBeGreaterThan(OBSERVABILITY.length);
     for (const port of published) {
+      // Long-syntax entries (objects) are rejected, so none can slip past the address check.
+      expect(typeof port).toBe("string");
       expect(port).toMatch(/^127\.0\.0\.1:/);
     }
   });
@@ -106,33 +111,43 @@ describe("compose profile observability", () => {
     }
   });
 
-  it("001/FR-023: Loki and Tempo keep 7 days and Prometheus 30 days, on named volumes", () => {
+  it("001/FR-023: Loki and Tempo keep 7 days on named volumes", () => {
     const volumes = Object.keys(record(compose["volumes"], "volumes"));
     for (const name of ["loki", "tempo", "prometheus"]) {
       const mounts = strings(service(name)["volumes"]);
       const named = mounts.filter((mount) => volumes.includes(mount.split(":")[0] ?? ""));
       expect(named, name).toHaveLength(1);
     }
-    expect(readFileSync("observability/loki.yaml", "utf8")).toMatch(/retention_period: 168h/);
-    expect(readFileSync("observability/tempo.yaml", "utf8")).toMatch(/block_retention: 168h/);
+    const loki = readYaml("observability/loki.yaml");
+    expect(record(loki["limits_config"], "limits_config")["retention_period"]).toBe("168h");
+    expect(record(loki["compactor"], "compactor")["retention_enabled"]).toBe(true);
+    const tempoCompactor = record(readYaml("observability/tempo.yaml")["compactor"], "compactor");
+    expect(record(tempoCompactor["compaction"], "compaction")["block_retention"]).toBe("168h");
+  });
+
+  it("001/FR-024: Prometheus keeps 30 days, enough for the 28-day SLO window", () => {
     expect(strings(service("prometheus")["command"])).toContain(
       "--storage.tsdb.retention.time=30d",
     );
   });
 
-  it("001/FR-021: mocks, when defined, run only in the profile dev", () => {
-    for (const name of serviceNames.filter((n) => profilesOf(n).includes("dev"))) {
-      expect(profilesOf(name), name).toEqual(["dev"]);
-    }
-    if (serviceNames.includes("mocks")) {
-      expect(profilesOf("mocks")).toEqual(["dev"]);
+  it("001/FR-013: mocks run only in the profile dev, and nothing else does", () => {
+    expect(serviceNames).toContain("mocks");
+    expect(profilesOf("mocks")).toEqual(["dev"]);
+    expect(serviceNames.filter((n) => profilesOf(n).includes("dev"))).toEqual(["mocks"]);
+  });
+
+  it("001/FR-019: api and worker default to no export endpoint", () => {
+    for (const name of ["api", "worker"]) {
+      expect(environment(name)["OTEL_EXPORTER_OTLP_ENDPOINT"], name).toBe(
+        "${OTEL_EXPORTER_OTLP_ENDPOINT:-}",
+      );
     }
   });
 
-  it("001/FR-021: api and worker default to no export endpoint and sample flows off", () => {
+  it("001/FR-027: api and worker default to sample flows off, outside development", () => {
     for (const name of ["api", "worker"]) {
       const env = environment(name);
-      expect(env["OTEL_EXPORTER_OTLP_ENDPOINT"], name).toBe("${OTEL_EXPORTER_OTLP_ENDPOINT:-}");
       expect(env["SAMPLE_FLOWS_ENABLED"], name).toBe("${SAMPLE_FLOWS_ENABLED:-false}");
       expect(env["DEPLOYMENT_ENVIRONMENT"], name).toBe("${DEPLOYMENT_ENVIRONMENT:-production}");
       expect(env["COMMON_GROUND_URL"], name).toBe("${COMMON_GROUND_URL:-}");
