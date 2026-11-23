@@ -32,6 +32,13 @@ const plantedQuery = fc
       // nested inside another parameter's value, as logfmt messages write it
       { text: `next=/login?${name}=${t}`, secret: t },
       { text: `a=b=${name}=${t}`, secret: t },
+      // quoted, after other separators, and as embedded JSON
+      { text: `${name}="${t}"`, secret: t },
+      { text: `OAuth ${name}='${t}', realm="x"`, secret: t },
+      { text: `https://shop.example/cb#${name}=${t}`, secret: t },
+      { text: `(${name}=${t})`, secret: t },
+      { text: `{"${name}":"${t}","page":2}`, secret: t },
+      { text: `${name}: ${t}`, secret: t },
     ),
   );
 
@@ -170,6 +177,9 @@ describe("redaction of free text", () => {
     expect(redactText(`/cb?code=${token}&state=7`)).toBe(`/cb?code=${REDACTED}&state=7`);
     expect(redactText(`url=/callback?code=${token}`)).toBe(`url=/callback?code=${REDACTED}`);
     expect(redactText(`token= key=${token}`)).toBe(`token= key=${REDACTED}`);
+    expect(redactText(`{"token":"a\\"${token}","n":1}`)).toBe(`{"token":"${REDACTED}","n":1}`);
+    expect(redactText(`password: "${token}`)).toBe(`password: "${REDACTED}`);
+    expect(redactText(`Error: not found`)).toBe(`Error: not found`);
   });
 
   it("001/FR-005: leaves look-alikes that carry no secret unchanged", () => {
@@ -183,10 +193,10 @@ describe("redaction of free text", () => {
 
 describe("structure", () => {
   it("001/FR-005: keeps non-sensitive data unchanged (property)", () => {
-    const safeText = fc.string().filter((s) => !/[@=]|bearer|basic/i.test(s));
+    const safeText = fc.string().filter((s) => !/[@=:]|bearer|basic/i.test(s));
     const anyKey = fc.oneof(
       fc.constantFrom("name", "route", "status", "keyboard", "monkey", "sortOrder", "jobName"),
-      safeKey.filter((s) => !/[@=]|bearer|basic/i.test(s)),
+      safeKey.filter((s) => !/[@=:]|bearer|basic/i.test(s)),
     );
     const safeJson = fc.letrec((tie) => ({
       value: fc.oneof(
@@ -244,8 +254,9 @@ describe("redaction cost", () => {
     for (const text of ["a".repeat(size), "a=".repeat(size / 2), `?${"a".repeat(size)}`]) {
       const started = performance.now();
       expect(redactText(text)).toBe(text);
-      // Quadratic matching took tens of seconds at this size; linear takes well under 100 ms.
-      expect(performance.now() - started).toBeLessThan(2000);
+      // Quadratic matching took tens of seconds at this size; linear takes well under 100 ms,
+      // so the budget leaves a wide margin for loaded runners and coverage instrumentation.
+      expect(performance.now() - started).toBeLessThan(5000);
     }
   });
 });

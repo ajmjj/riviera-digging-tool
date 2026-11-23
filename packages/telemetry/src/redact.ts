@@ -59,7 +59,9 @@ export function isSecretName(name: string): boolean {
 // Every pattern is linear in the input: quantifiers that could rescan the text from each start
 // position are bounded (RFC 5321 limits for emails), so a large untruncated value can't stall
 // the event loop (US5) before truncation runs.
-// Dot-atom email addresses, with any atext character in the local part.
+// Dot-atom email addresses, with any atext character in the local part. Accepted limits of
+// the bounds: only the last 64 local-part characters and 9 domain labels are replaced, a label
+// over 63 characters or a non-ASCII address does not match.
 const EMAIL =
   /[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){1,8}/g;
 // RFC 6750 bearer tokens of 8+ characters, so prose like "the bearer of" keeps its words. The
@@ -67,10 +69,11 @@ const EMAIL =
 const BEARER = /\bBearer\s+(?!Bearer\b)[A-Za-z0-9\-._~+/]{8,}=*/gi;
 // Basic credentials (scheme in any case): only redacted when the base64 decodes to `user:pass`.
 const BASIC = /\bBasic\s+(?!Basic\b)([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])/gi;
-// `name=` after a query, list, whitespace or `=` separator: `?token=…`, `&code=…`,
-// `Discogs token=…`, `key=…, secret=…`, and nested ones such as `next=/login?token=…`.
-const PARAM_NAME = /(?<=^|[?&;,\s=])[\w.-]{1,128}=/g;
-const PARAM_VALUE_END = /[\s&#,;"'<>]/g;
+// `name=` or `name:` after a separator, the name optionally quoted: `?token=…`, `#code=…`,
+// `Discogs token=…`, `key=…, secret=…`, `password: …`, `{"token":"…"}`, and nested ones
+// such as `next=/login?token=…`.
+const PARAM_NAME = /(?<=^|[?&;,\s=#/:([{"'])(["']?)[\w.-]{1,128}\1\s?(?:=|:\s?)/g;
+const PARAM_VALUE_END = /[\s&#,;"'<>)\]}]/g;
 
 /** Redacts emails, bearer/basic credentials and secret-named parameters in free text. */
 export function redactText(text: string): string {
@@ -91,13 +94,23 @@ function redactParams(text: string): string {
   let output = "";
   let copied = 0;
   for (let match = names.exec(text); match !== null; match = names.exec(text)) {
-    const name = match[0].slice(0, -1);
+    const name = match[0].replace(/["'\s:=]/g, "");
     if (!isSecretName(name) && !SECRET_PARAM_NAMES.has(name.toLowerCase())) {
       continue;
     }
-    const start = match.index + match[0].length;
-    PARAM_VALUE_END.lastIndex = start;
-    const end = PARAM_VALUE_END.exec(text)?.index ?? text.length;
+    let start = match.index + match[0].length;
+    if (text.startsWith(REDACTED, start)) {
+      continue; // already redacted by an earlier pattern, e.g. `Authorization: Bearer …`
+    }
+    let end: number;
+    const quote = text.charAt(start);
+    if (quote === '"' || quote === "'") {
+      start += 1;
+      end = closingQuote(text, quote, start);
+    } else {
+      PARAM_VALUE_END.lastIndex = start;
+      end = PARAM_VALUE_END.exec(text)?.index ?? text.length;
+    }
     if (end > start) {
       output += text.slice(copied, start) + REDACTED;
       copied = end;
@@ -105,6 +118,19 @@ function redactParams(text: string): string {
     }
   }
   return output + text.slice(copied);
+}
+
+// Index of the quote closing a quoted value (backslash escapes skipped), or the text's end.
+function closingQuote(text: string, quote: string, from: number): number {
+  for (let i = from; i < text.length; i += 1) {
+    const char = text.charAt(i);
+    if (char === "\\") {
+      i += 1;
+    } else if (char === quote) {
+      return i;
+    }
+  }
+  return text.length;
 }
 
 /**
