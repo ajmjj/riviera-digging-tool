@@ -8,10 +8,14 @@
     "start:worker": "node src/main.ts worker"
   },
   "dependencies": {
+    "@opentelemetry/api": "1.10.0",
+    "@riviera/telemetry": "workspace:*",
     "fastify": "5.12.8",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@riviera/common-ground": "workspace:*",
     "@types/pg": "8.23.1",
     "yaml": "2.9.1"
   }
