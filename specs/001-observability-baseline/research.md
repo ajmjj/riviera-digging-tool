@@ -70,8 +70,10 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
     `keyboard` or `monkey` are not.
   - Value-based: email addresses, `Bearer …`, `Discogs token=…`, `Basic …`, and URL query
     parameters named like secrets (`?token=…`, `&key=…`, `&code=…`) → `"[REDACTED]"`.
-  - Request headers are never logged except an allow-list (`user-agent`, `content-type`,
-    `x-request-id`); `authorization` and `cookie` would be redacted anyway.
+  - Request headers are never logged except an allow-list (`user-agent`, `content-type`);
+    `authorization` and `cookie` would be redacted anyway. `x-request-id` is not on it: the
+    validated ID is logged as `request_id`, so an invalid header is never logged as sent
+    (FR-003).
   - Order: redaction runs first, truncation last, so replacing a value with `[REDACTED]` can't
     push a string back over the limit.
   - `truncate(value)`: strings over 8192 UTF-8 bytes are cut at a character boundary and

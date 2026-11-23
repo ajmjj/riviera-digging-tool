@@ -4,7 +4,7 @@
 // too large to review whole, writes a blocking review to .review/precheck.json instead.
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { changedFilenames } from "./lib/github.ts";
+import { changedFilenames, labelNames } from "./lib/github.ts";
 import {
   blocked,
   buildReviewInput,
@@ -51,6 +51,7 @@ try {
       constitution: readFileSync(".specify/memory/constitution.md", "utf8"),
       prTitle: String(prop(pr, "title")),
       prBody: typeof body === "string" ? body : "",
+      labels: labelNames(pr),
       diff,
       specDocuments,
     }),
