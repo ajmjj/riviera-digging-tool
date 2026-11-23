@@ -54,7 +54,10 @@ jobs:
           install: "false"
       - name: Antn's approval for protected paths and needs-human
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # Dependabot-triggered runs get a read-only github.token whatever `permissions` says, so
+          # removing a stale approval label fails with 403. For Dependabot only, use a token
+          # stored as a *Dependabot* secret (Settings > Secrets > Dependabot) with issues:write.
+          GITHUB_TOKEN: ${{ github.actor == 'dependabot[bot]' && secrets.GATE_LABEL_TOKEN || github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           EVENT_ACTION: ${{ github.event.action }}
         run: node ci/human-gate.ts
