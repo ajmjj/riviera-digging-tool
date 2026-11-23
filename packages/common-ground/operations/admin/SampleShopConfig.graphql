@@ -1,0 +1,7 @@
+# Sample flow of specs/001-observability-baseline (001/FR-013, contracts/mocks.md). The mocks
+# answer it from apps/mocks/fixtures/common-ground/SampleShopConfig.json.
+query SampleShopConfig {
+  config {
+    shopName
+  }
+}
