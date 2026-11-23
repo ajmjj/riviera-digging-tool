@@ -204,7 +204,8 @@ describe("redaction (001/FR-005)", () => {
         "x-forwarded-for": "203.0.113.7",
         "user-agent": "curl/8.0",
         "content-type": "application/json",
-        "x-request-id": "req_1",
+        // Planted: off the allow-list, so it must never reach the line (001/FR-003).
+        "x-request-id": "planted_request_id",
         "content-language": ["en", "fr"],
       },
     };
@@ -219,12 +220,18 @@ describe("redaction (001/FR-005)", () => {
         headers: {
           "user-agent": "curl/8.0",
           "content-type": "application/json",
-          "x-request-id": "req_1",
         },
       },
       res: { statusCode: 202 },
     });
     expect(Object.keys(lines()[0]?.["req"] ?? {})).toEqual(["method", "url", "headers"]);
+    // The planted `x-request-id` is off the allow-list: only the validated ID is ever logged,
+    // as `request_id` (001/FR-003).
+    expect(lines()[0]?.["req"]).toHaveProperty("headers", {
+      "user-agent": "curl/8.0",
+      "content-type": "application/json",
+    });
+    expect(raw.join("")).not.toContain("planted_request_id");
     expect(lines()[0]?.["res"]).toEqual({ statusCode: 202 });
   });
 

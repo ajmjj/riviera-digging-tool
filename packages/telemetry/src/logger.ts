@@ -37,8 +37,11 @@ export interface LoggerOptions {
   readonly write?: (line: string) => void;
 }
 
-/** Research R4: the only request headers ever logged. */
-const LOGGED_HEADERS: readonly string[] = ["user-agent", "content-type", "x-request-id"];
+/**
+ * Research R4: the only request headers ever logged. `x-request-id` is not on it: the validated
+ * ID is logged as `request_id`, and the raw header never is (001/FR-003).
+ */
+const LOGGED_HEADERS: readonly string[] = ["user-agent", "content-type"];
 
 const SCOPE = "@riviera/telemetry/logger";
 

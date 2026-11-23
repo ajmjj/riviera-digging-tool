@@ -19,8 +19,6 @@ description of the task it names, and that PR either acts on it or says why not.
 
 - Record through `createInstruments(meter, { routes })` from `@riviera/telemetry/instruments`.
   `routes` is the list of registered route templates; `unmatched` is always allowed.
-- `riviera.queue.depth` reports 0 for every registered job name with no queued rows (research
-  R18); `observe()` reports only what its callback passes to `report`, so T017 fills in the zeros.
 
 ## T016 (from T013)
 

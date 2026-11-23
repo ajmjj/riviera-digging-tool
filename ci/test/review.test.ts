@@ -18,6 +18,7 @@ const input = {
   constitution: "# Constitution\nRule one.",
   prTitle: "Add healthz",
   prBody: "Covers T001.",
+  labels: [],
   diff: "diff --git a/x b/x",
   specDocuments: [],
 };
@@ -32,6 +33,20 @@ describe("buildReviewInput", () => {
     expect(prompt).toContain('<document path="specs/001-obs/spec.md">\nFR text\n</document>');
     expect(prompt).toContain("Title: Add healthz\n\nCovers T001.");
     expect(prompt).toContain("<diff>\ndiff --git a/x b/x\n</diff>");
+  });
+
+  it("lists the PR's labels so the reviewer can see needs-human", () => {
+    const prompt = buildReviewInput({ ...input, labels: ["dependencies", "needs-human"] });
+    expect(prompt).toContain("<pr_labels>\ndependencies\nneeds-human\n</pr_labels>");
+  });
+
+  it("says so when the PR has no labels", () => {
+    expect(buildReviewInput(input)).toContain("<pr_labels>\n(none)\n</pr_labels>");
+  });
+
+  it("judges the needs-human rule by the labels, not the description", () => {
+    expect(reviewerPrompt()).toContain("but <pr_labels> does not include needs-human");
+    expect(reviewerPrompt()).not.toContain("whose description shows no sign of it");
   });
 
   it("says so when the PR has no feature spec", () => {
