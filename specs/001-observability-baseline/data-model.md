@@ -101,7 +101,7 @@ generator's output (stale check, like codegen).
 ## 5. Telemetry signal (every log line, span and metric point)
 
 Always carries resource attributes `service.name` (`riviera-api` | `riviera-worker`),
-`service.namespace=riviera`, `deployment.environment.name` (`DEPLOYMENT_ENVIRONMENT`, default
-`development`) and `service.version` (package version). Never carries personal data or secrets
+`service.namespace=riviera`, `deployment.environment.name` (`DEPLOYMENT_ENVIRONMENT`; unset means
+`production`, research R17) and `service.version` (package version). Never carries personal data or secrets
 (FR-005): enforced by `redact()` on logs and on spans at export, and by the closed label sets on
 metrics.

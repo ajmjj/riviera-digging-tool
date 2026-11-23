@@ -44,6 +44,13 @@ need it, split that change into its own PR.
 
 **Checkpoint**: `node ci/slo-check.ts` reports all catalog metrics registered (SC-004).
 
+**What "exported" means (FR-014, SC-004)**: every catalog instrument is created on the startup
+meter, so it is registered and exportable from the first export cycle. The OpenTelemetry SDK sends
+no data points for an instrument nothing has recorded yet, and this feature deliberately emits no
+zero values, because FR-025 requires an SLO dashboard to say "No data recorded yet" until real data
+exists. T001's export test therefore records one value per instrument in a test meter and checks it
+reaches the in-memory exporter, and R14 step 1 expects the SLO panels to be empty.
+
 ---
 
 ## Phase 2: Foundational (blocks every story)

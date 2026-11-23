@@ -10,7 +10,7 @@ changing one is a contract change.
 | `service.name` | `riviera-api` or `riviera-worker` |
 | `service.namespace` | `riviera` |
 | `service.version` | `apps/api/package.json` version |
-| `deployment.environment.name` | `DEPLOYMENT_ENVIRONMENT` (`development` default, `ci` in CI) |
+| `deployment.environment.name` | `DEPLOYMENT_ENVIRONMENT`: `development` (`make up-dev`), `ci` in CI, `production` when unset (fails closed, research R17) |
 
 ## Spans
 
