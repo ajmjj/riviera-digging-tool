@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../../src/config.ts";
 import { startService, type Service } from "../../src/startup.ts";
 import { freshDatabase, type FreshDatabase } from "./fresh-database.ts";
@@ -46,8 +46,19 @@ describe("001/FR-029: startup (real Postgres)", () => {
       const signals = new EventEmitter();
       const started = await startService(config("api"), signals);
       signals.emit(signal);
+      // No explicit stop() first: the signal alone must close the server.
+      await vi.waitFor(() => {
+        expect(started.app.server.listening).toBe(false);
+      });
       await started.stop();
-      expect(started.app.server.listening).toBe(false);
     }
+  });
+
+  it("001/FR-029: a failed listen (port taken) rejects instead of leaving a half-started service", async () => {
+    service = await startService(config("api"), new EventEmitter());
+    const address = service.app.server.address();
+    const port = typeof address === "object" && address !== null ? address.port : 0;
+    const taken = { ...config("worker"), port };
+    await expect(startService(taken, new EventEmitter())).rejects.toThrow(/EADDRINUSE/);
   });
 });

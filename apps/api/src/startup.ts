@@ -34,7 +34,12 @@ export async function startService(
   signals.once("SIGTERM", () => void stop());
   signals.once("SIGINT", () => void stop());
 
-  await app.listen({ host: "0.0.0.0", port: config.port });
+  try {
+    await app.listen({ host: "0.0.0.0", port: config.port });
+  } catch (error) {
+    await stop();
+    throw error;
+  }
   app.log.info({ role: config.role, migrationsApplied: applied }, "started");
   return { app, stop };
 }
