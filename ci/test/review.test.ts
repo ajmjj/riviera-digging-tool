@@ -150,6 +150,11 @@ describe("reviewJsonSchema", () => {
     const parsed: unknown = JSON.parse(schema);
     expect(parsed).toMatchObject({ type: "object", required: ["summary", "findings"] });
   });
+
+  it("carries no $schema marker (Claude Code rejects the draft 2020-12 one)", () => {
+    expect(reviewJsonSchema()).not.toContain("$schema");
+    expect(reviewJsonSchema()).not.toContain("2020-12");
+  });
 });
 
 describe("parseReviewOutput", () => {
