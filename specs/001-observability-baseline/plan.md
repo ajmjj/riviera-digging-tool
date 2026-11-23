@@ -81,10 +81,10 @@ No open `NEEDS CLARIFICATION`: every unknown is resolved in research.md.
 | Principle / gate | How this plan complies | Status |
 |---|---|---|
 | I. CI is the only path to `main` | Every task is its own PR through the existing required checks. The FR-033 check is added as steps of the existing `stack` job, so no new required check name appears and nothing is skipped. | ✅ |
-| II. Never weaken the safety net | No threshold, suppression or ruleset change. Protected paths touched by implementation tasks: `**/tsconfig*.json`, `knip.json`, `ci/scope.json` (T001), `ci/**` and `.github/workflows/ci.yml` (T023, T024). Every task PR is labelled `needs-human` (T001–T023 ask for the fr-trace exception; T001, T023, T024 touch protected paths). T001 states that adding entrypoints to `ci/scope.json` takes those thin files out of coverage, so Antn can judge it as a possible loosening. This plan PR touches only `specs/` and is `needs-human` because it asks for the fr-trace exception. `ci/slo-catalog.json` is unchanged (research R6). | ✅ |
+| II. Never weaken the safety net | No threshold, suppression or ruleset change. Protected paths touched by implementation tasks: `**/tsconfig*.json`, `knip.json`, `ci/scope.json` (T001), `ci/**` and `.github/workflows/ci.yml` (T023, T024). Every task PR is labelled `needs-human` (T001–T023 ask for the fr-trace exception; T001, T023, T024 touch protected paths). T001 states that adding entrypoints to `ci/scope.json` takes those thin files out of coverage, so Antn can judge it as a possible loosening. This plan PR touches only `specs/` and is `needs-human` because it asks for Antn's `approved-exception` for two recorded deviations: fr-trace (all FRs untested) and its size (see V). `ci/slo-catalog.json` is unchanged (research R6). | ✅ (with recorded exception) |
 | III. Spec first, fully traceable | Every task names the FRs it covers; every FR-001…FR-033 is covered by at least one task with a `001/FR-###` test (matrix in tasks.md). Task PRs before the last need Antn's `approved-exception` for the untested-FR part of `fr-trace`; each PR says so. | ✅ |
 | IV. Tests lead | Each task writes its tests with the code. Redaction gets property tests (fast-check). No domain code in this feature, so mutation testing stays a no-op; the queue is infrastructure, not one of the listed domain areas. | ✅ |
-| V. Small PRs | 24 tasks, each sized ≤ ~400 changed lines excluding lockfile, generated dashboards JSON and fixtures (estimates in tasks.md). | ✅ |
+| V. Small PRs | 24 tasks, each sized ≤ ~400 changed lines excluding lockfile, generated dashboards JSON and fixtures (estimates in tasks.md). **Deviation:** this plan PR itself is ~1,250 lines of Spec Kit planning documents with no code; it is recorded in the PR and covered by Antn's `approved-exception`. | ⚠️ deviation recorded |
 | VI. No live side effects | Common Ground and Discogs only via the local mocks service; config refuses the real hosts (FR-013). The only Common Ground call is a read (`config { shopName }`), so `COMMON_GROUND_WRITES_ENABLED` is not involved. | ✅ |
 | VII. Traces, metrics, logs | This feature *is* Principle VII: stack, profile, `staff_id` context, JSON logs with CI-tested redaction, spans on HTTP/jobs/outbound calls, the minimum metrics, catalog check made real, emission tests. `/healthz` and `/readyz` stay as they are. | ✅ |
 | VIII. Product invariants | Secrets: no secret enters telemetry (FR-005, US4), the PWA is untouched. Isolation: staff IDs never become metric labels. Other invariants untouched. | ✅ |
@@ -147,7 +147,8 @@ apps/api/src/                       # existing; api and worker
 ├── jobs/runner.ts                  # NEW: worker loop, job spans, job metrics, queue depth
 ├── sample/routes.ts                # NEW: POST /sample/trace (flagged)
 ├── sample/job.ts                   # NEW: sample.discogs_release job
-└── main.ts                         # wiring only (excluded from coverage)
+├── startup.ts                      # NEW: startApi()/startWorker(): migrate → telemetry + zero-init flush → listen/poll (tested)
+└── main.ts                         # one call into startup.ts (excluded from coverage)
 apps/api/migrations/0001_job.{up,down}.sql   # NEW
 
 apps/mocks/                         # NEW workspace @riviera/mocks (own image, compose profile `dev`)

@@ -212,6 +212,10 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
   - later attempts: children of that first-attempt span, also linked to the producer — so
     retries are new spans in the same trace (edge case), and the job trace is navigable to
     the request trace in Tempo's "Links" panel.
+  - if the first attempt crashed (its lease expired, R12), its span was never exported, so the
+    sweep clears `job.trace_parent`; the next attempt then starts a new root span (still linked
+    to the producer) and stores its own context. Retries never hang off a parent that doesn't
+    exist in Tempo.
   - no originating request (scheduled jobs): no producer link; the first attempt starts its
     own trace.
 - **Failure metric** (spec clarification Q1, FR-016): `riviera.jobs.failures` counts failed **attempts** (once
@@ -304,16 +308,16 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
   (total events in the 28-day window > 0), not by a series being absent.
 - **Why**: Prometheus's `increase()` needs a sample before the first change. A counter series
   that first appears at 1 loses that first event, which for the checkout `paid_after_mismatch`
-  SLO would hide exactly the violation it exists to catch. Zero samples also make FR-014's
-  "registered and exported at startup" literally true.
+  SLO would hide exactly the violation it exists to catch. Zero samples also give FR-014's
+  "counters exported from startup, starting at zero" (as clarified in
+  ajmjj/riviera-digging-tool#10).
 - **Limits**: a histogram can't be zero-initialised without an observation, so the first-ever
   observation of a new histogram series may be missed by `increase()`. With many observations
   this is noise; T014 also turns on Prometheus's created-timestamp zero ingestion for OTLP if the
   pinned version supports it, and documents what it found. `riviera.sync.last_success` is never
-  zero-initialised (0 would read as 1970). So for these instruments the plan deviates from a
-  literal reading of FR-014 ("exported at startup"): they are registered at startup and exported
-  from their first observation. This deviation is recorded in the plan PR and needs Antn's
-  `approved-exception` there (Governance), or a spec clarification if he prefers.
+  zero-initialised (0 would read as 1970). These instruments are registered at startup and
+  exported from their first observation, which is what the clarified FR-014 asks for
+  (ajmjj/riviera-digging-tool#10).
 - **Alternatives**: rely on Prometheus created-timestamp ingestion alone (version-dependent,
   and not verifiable until T014); PromQL workarounds such as `or` on the raw series (complex
   and easy to get wrong per panel).
