@@ -21,3 +21,10 @@ description of the task it names, and that PR either acts on it or says why not.
   `routes` is the list of registered route templates; `unmatched` is always allowed.
 - `riviera.queue.depth` reports 0 for every registered job name with no queued rows (research
   R18); `observe()` reports only what its callback passes to `report`, so T017 fills in the zeros.
+
+## T024 (from T014 / T015)
+
+- R11: `docker compose --profile dev --profile observability config --images` lists the locally
+  built derived images (`riviera-dig/otel-collector:local`, `riviera-dig/loki:local`,
+  `riviera-dig/tempo:local`). The Trivy step must scan them after the build, not try to pull
+  them, so the upstream images inside them (and the copied busybox) are covered.
