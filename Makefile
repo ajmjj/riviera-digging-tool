@@ -1,4 +1,4 @@
-.PHONY: help env up down logs ps smoke check test-integration
+.PHONY: help env up down logs ps smoke check test-integration up-observability up-dev down-observability
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -11,6 +11,22 @@ up: env ## Build and start the stack, waiting for every healthcheck (120 s limit
 
 down: ## Stop the stack (keeps the database volume)
 	docker compose down
+
+# Research R9: only these targets set the OTLP endpoint, so the plain stack never warns about
+# dropped telemetry. Research R17: only `up-dev` (and CI) turns the sample flows and mocks on.
+OTLP_ENDPOINT := OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+SAMPLE_FLOWS := SAMPLE_FLOWS_ENABLED=true DEPLOYMENT_ENVIRONMENT=development \
+	COMMON_GROUND_URL=http://mocks:4000 DISCOGS_URL=http://mocks:4000
+
+up-observability: env ## Start the stack with the observability profile, exporting telemetry
+	$(OTLP_ENDPOINT) docker compose --profile observability up --build --detach --wait --wait-timeout 120
+
+up-dev: env ## Start the stack with the dev (mocks, sample flows) and observability profiles
+	$(OTLP_ENDPOINT) $(SAMPLE_FLOWS) docker compose --profile dev --profile observability \
+		up --build --detach --wait --wait-timeout 120
+
+down-observability: ## Stop the stack and both profiles (keeps volumes; add --volumes to discard telemetry)
+	docker compose --profile dev --profile observability down
 
 logs: ## Follow logs from every service
 	docker compose logs --follow --tail 100

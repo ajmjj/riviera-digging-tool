@@ -1,0 +1,50 @@
+# OpenTelemetry Collector (core distribution), research R7/R8. The api and worker send OTLP/HTTP
+# here; traces go to Tempo, logs to Loki's native OTLP endpoint and metrics to Prometheus's OTLP
+# receiver. No sampling processor: every trace is kept locally (001/FR-023, R10).
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  batch:
+    timeout: 1s
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+  otlphttp/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+
+service:
+  telemetry:
+    # Internal metrics on :8888, which the compose healthcheck probes from inside the container.
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 127.0.0.1
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]

@@ -1,0 +1,29 @@
+# Tempo, single binary on a named volume, research R8/R10. Traces arrive over OTLP gRPC from the
+# collector only (4317 is not published). Retention 7 days (168h).
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+compactor:
+  compaction:
+    block_retention: 168h
+
+usage_report:
+  reporting_enabled: false

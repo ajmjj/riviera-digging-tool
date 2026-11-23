@@ -1,8 +1,9 @@
 name: riviera-dig
 
-# Everything runs with `docker compose up`. Nothing is published to the internet: the proxy
-# binds to 127.0.0.1 only. The Cloudflare Tunnel (`cloudflared`) and the observability stack
-# (001) join later behind their own profiles.
+# Everything runs with `docker compose up`. Nothing is published to the internet: every
+# published port binds to 127.0.0.1 only. The observability stack (001) sits behind the profile
+# `observability` (`make up-observability`, `make up-dev`); the app services never depend on it.
+# The Cloudflare Tunnel (`cloudflared`) joins later behind its own profile.
 
 x-node-service: &node-service
   build:
@@ -17,6 +18,13 @@ x-node-service: &node-service
     DATABASE_URL: postgres://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@db:5432/${POSTGRES_DB:?set in .env}
     APP_URL: ${APP_URL:?set in .env}
     LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Empty unless `make up-observability` / `make up-dev` sets it (research R9).
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    # Sample flows: off unless `make up-dev` or CI turns them on (research R17).
+    SAMPLE_FLOWS_ENABLED: ${SAMPLE_FLOWS_ENABLED:-false}
+    DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-production}
+    COMMON_GROUND_URL: ${COMMON_GROUND_URL:-}
+    DISCOGS_URL: ${DISCOGS_URL:-}
 
 services:
   db:
@@ -128,5 +136,97 @@ services:
       retries: 20
       start_period: 3s
 
+  # --- Profile `observability` (001/FR-021): research R7, R8, R10 ---
+
+  otel-collector:
+    profiles: [observability]
+    build:
+      context: .
+      dockerfile: docker/otel-collector.Dockerfile
+    image: riviera-dig/otel-collector:local
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OTEL_COLLECTOR_PORT:-4318}:4318"
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "--spider", "http://127.0.0.1:8888/metrics"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  loki:
+    profiles: [observability]
+    build:
+      context: .
+      dockerfile: docker/loki.Dockerfile
+    image: riviera-dig/loki:local
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "--spider", "http://127.0.0.1:3100/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  tempo:
+    profiles: [observability]
+    build:
+      context: .
+      dockerfile: docker/tempo.Dockerfile
+    image: riviera-dig/tempo:local
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports:
+      - "127.0.0.1:${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "--spider", "http://127.0.0.1:3200/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-otlp-receiver
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9090/-/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
 volumes:
   pgdata:
+  loki-data:
+  tempo-data:
+  prometheus-data:
