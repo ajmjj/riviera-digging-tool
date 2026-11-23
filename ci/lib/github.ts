@@ -32,7 +32,13 @@ export function createGitHub(token: string, repo: string, fetchFn: typeof fetch)
     });
     const res = await fetchFn(url, { ...init, headers: merged });
     if (!res.ok) {
-      throw new Error(`GitHub ${init.method ?? "GET"} ${url} failed: HTTP ${String(res.status)}`);
+      const needed = res.headers.get("x-accepted-github-permissions");
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      throw new Error(
+        `GitHub ${init.method ?? "GET"} ${url} failed: HTTP ${String(res.status)}` +
+          (needed === null ? "" : ` (needs one of: ${needed})`) +
+          (detail === "" ? "" : `: ${detail}`),
+      );
     }
     return res;
   }
