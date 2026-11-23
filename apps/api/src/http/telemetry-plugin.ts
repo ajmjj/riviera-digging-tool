@@ -62,6 +62,7 @@ export interface TelemetryPluginOptions {
 export function registerTelemetry(app: FastifyInstance, options: TelemetryPluginOptions): void {
   const routes = new Set<string>();
   const active = new WeakMap<FastifyRequest, Span>();
+  const errors = new WeakMap<FastifyRequest, Error>();
   let instruments: Instruments | undefined;
 
   app.addHook("onRoute", (route) => {
@@ -111,8 +112,9 @@ export function registerTelemetry(app: FastifyInstance, options: TelemetryPlugin
     done();
   });
 
+  // Kept until the response: only a 5xx span records its exception, not a 4xx parse failure.
   app.addHook("onError", (request, _reply, error, done) => {
-    active.get(request)?.recordException(error);
+    errors.set(request, error);
     done();
   });
 
@@ -126,6 +128,8 @@ export function registerTelemetry(app: FastifyInstance, options: TelemetryPlugin
     const code = reply.statusCode;
     span.setAttribute("http.response.status_code", code);
     if (code >= 500) {
+      const error = errors.get(request);
+      if (error !== undefined) span.recordException(error);
       span.setStatus({ code: SpanStatusCode.ERROR });
     }
     span.end();

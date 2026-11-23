@@ -12,9 +12,8 @@ import {
 } from "../src/http/request-context.ts";
 import { registerTelemetry, UNMATCHED_ROUTE } from "../src/http/telemetry-plugin.ts";
 
-// Fastify telemetry plugin with the T004 in-memory exporters (contracts/telemetry.md#spans,
-// #metrics). The app is assembled in the order T016 wires it: request context, telemetry, then
-// routes.
+// Telemetry plugin with the T004 in-memory exporters (contracts/telemetry.md#spans, #metrics),
+// assembled in the order T016 wires it: request context, telemetry, then routes.
 
 const TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
 const PARENT_ID = "00f067aa0ba902b7";
@@ -23,6 +22,10 @@ const DURATION = "riviera.http.server.duration";
 type ExportedSpan = Awaited<ReturnType<TestTelemetry["spans"]>>[number];
 
 let telemetry: TestTelemetry;
+const otel = () => ({
+  tracer: telemetry.telemetry.tracerProvider.getTracer("test"),
+  meter: telemetry.telemetry.meterProvider.getMeter("test"),
+});
 let app: FastifyInstance;
 let raw: string[];
 
@@ -37,10 +40,7 @@ beforeEach(() => {
   });
   app = Fastify({ loggerInstance: logger, ...requestContextOptions(isHealthRequest) });
   registerRequestContext(app);
-  registerTelemetry(app, {
-    tracer: telemetry.telemetry.tracerProvider.getTracer("test"),
-    meter: telemetry.telemetry.meterProvider.getMeter("test"),
-  });
+  registerTelemetry(app, otel());
   registerHealthRoutes(app, { pingDatabase: () => Promise.resolve() });
   app.get("/records/:id", (request) => {
     request.log.info("record handled");
@@ -112,13 +112,17 @@ describe("001/FR-007: one SERVER span per request, named by route template", () 
     expect(JSON.stringify(span.attributes)).not.toContain("/no/such/path");
   });
 
-  it("001/FR-007: a 5xx marks the span ERROR and records the exception", async () => {
-    const res = await app.inject("/broken");
-    expect(res.statusCode).toBe(500);
-    const span = await onlySpan();
-    expect(span.status.code).toBe(SpanStatusCode.ERROR);
-    expect(span.attributes["http.response.status_code"]).toBe(500);
-    expect(span.events.map((event) => event.name)).toEqual(["exception"]);
+  it("001/FR-007: a 5xx is ERROR with its exception; a 4xx error records neither", async () => {
+    expect((await app.inject("/broken")).statusCode).toBe(500);
+    const bad = { "content-type": "application/json" };
+    const res = await app.inject({ method: "POST", url: "/staff", payload: "{", headers: bad });
+    expect(res.statusCode).toBe(400);
+    const [broken, parse] = await telemetry.spans();
+    expect(broken?.status.code).toBe(SpanStatusCode.ERROR);
+    expect(broken?.attributes["http.response.status_code"]).toBe(500);
+    expect(broken?.events.map((event) => event.name)).toEqual(["exception"]);
+    expect(parse?.status.code).toBe(SpanStatusCode.UNSET);
+    expect(parse?.events).toEqual([]);
   });
 
   it("001/FR-007, 001/FR-017: an unknown method is recorded as _OTHER, never echoed", async () => {
@@ -213,10 +217,7 @@ describe("001/FR-017, 001/FR-018: riviera.http.server.duration with bounded labe
   it("001/FR-018: a route registered before the plugin is counted as unmatched, not rejected", async () => {
     const early = Fastify();
     early.get("/early", () => ({ ok: true }));
-    registerTelemetry(early, {
-      tracer: telemetry.telemetry.tracerProvider.getTracer("test"),
-      meter: telemetry.telemetry.meterProvider.getMeter("test"),
-    });
+    registerTelemetry(early, otel());
     expect((await early.inject("/early")).statusCode).toBe(200);
     await early.close();
     expect((await onlySpan()).name).toBe("GET /early");
@@ -224,18 +225,25 @@ describe("001/FR-017, 001/FR-018: riviera.http.server.duration with bounded labe
   });
 
   it("001/FR-007: a request the client aborts still ends and exports its span, without a status code or metric point", async () => {
-    app.get("/slow", () => new Promise(() => undefined));
+    const handling = new Promise<void>((resolve) => {
+      app.get("/slow", () => (resolve(), new Promise(() => undefined)));
+    });
+    // Runs after the plugin's own onRequestAbort hook, which was registered first.
+    const aborted = new Promise<void>((resolve) => {
+      app.addHook("onRequestAbort", (_request, done) => {
+        resolve();
+        done();
+      });
+    });
     await app.listen({ port: 0, host: "127.0.0.1" });
     const address = app.server.address();
     if (address === null || typeof address === "string") throw new Error("no port");
     const sent = httpRequest({ host: "127.0.0.1", port: address.port, path: "/slow" });
     sent.on("error", () => undefined);
     sent.end();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await handling;
     sent.destroy();
-    for (let i = 0; i < 40 && (await telemetry.spans()).length === 0; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
+    await aborted;
     const span = await onlySpan();
     expect(span.name).toBe("GET /slow");
     expect(span.attributes["http.response.status_code"]).toBeUndefined();
