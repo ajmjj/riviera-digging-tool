@@ -1,4 +1,4 @@
-import { SpanKind, SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+import { context, SpanKind, SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import pg from "pg";
 
 /** What a query returns. Rows are unknown: callers narrow them with a type guard. */
@@ -65,7 +65,8 @@ function errorType(error: unknown): string {
 
 async function traced(span: Span, run: () => Promise<QueryResult>): Promise<QueryResult> {
   try {
-    return await run();
+    // The db span is active while the query runs, so anything nested under it is its child.
+    return await context.with(trace.setSpan(context.active(), span), run);
   } catch (error) {
     span.setAttribute("error.type", errorType(error));
     span.setStatus({ code: SpanStatusCode.ERROR });

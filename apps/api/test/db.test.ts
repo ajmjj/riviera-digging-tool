@@ -138,6 +138,37 @@ describe("db query spans", () => {
     ]);
   });
 
+  it("001/FR-008: a rejection that is not an Error records error.type `Error`", async () => {
+    // A thenable lets the fake reject with a plain string, as a misbehaving driver could.
+    const rejectsWithString = {
+      then(_onFulfilled: (value: QueryResult) => void, onRejected: (reason: unknown) => void) {
+        onRejected("plain");
+      },
+    };
+    const db = databaseFromPool({
+      query: async () => await rejectsWithString,
+      end: () => Promise.resolve(),
+    });
+    await expect(underParent(() => db.query("sample.plain", "SELECT 1"))).rejects.toBe("plain");
+    const span = (await telemetry.spans()).find((s) => s.name === "db SELECT");
+    expect(span?.attributes["error.type"]).toBe("Error");
+    expect(span?.status.code).toBe(SpanStatusCode.ERROR);
+  });
+
+  it("001/FR-008: the db span is active while the query runs", async () => {
+    let activeDuringQuery: string | undefined;
+    const db = databaseFromPool({
+      query: () => {
+        activeDuringQuery = trace.getActiveSpan()?.spanContext().spanId;
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      },
+      end: () => Promise.resolve(),
+    });
+    await underParent(() => db.query("sample.nested", "SELECT 1"));
+    const span = (await telemetry.spans()).find((s) => s.name === "db SELECT");
+    expect(activeDuringQuery).toBe(span?.spanContext().spanId);
+  });
+
   it("001/FR-008: a summary that is not a statement name is rejected before querying", async () => {
     const pool = fakePool();
     const db = databaseFromPool(pool);
