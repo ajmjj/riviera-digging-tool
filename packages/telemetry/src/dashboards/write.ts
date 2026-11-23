@@ -4,9 +4,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { OVERVIEW_FILE, overviewDashboard } from "./overview.ts";
+import { sloDashboards } from "./slo-queries.ts";
 
 const root = new URL("../../../../observability/grafana/dashboards/", import.meta.url);
-const path = fileURLToPath(new URL(OVERVIEW_FILE, root));
-mkdirSync(dirname(path), { recursive: true });
-writeFileSync(path, `${JSON.stringify(overviewDashboard(), null, 2)}\n`);
-process.stdout.write(`wrote ${path}\n`);
+const files = [{ file: OVERVIEW_FILE, dashboard: overviewDashboard() }, ...sloDashboards()];
+for (const { file, dashboard } of files) {
+  const path = fileURLToPath(new URL(file, root));
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(dashboard, null, 2)}\n`);
+  process.stdout.write(`wrote ${path}\n`);
+}

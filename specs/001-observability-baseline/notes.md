@@ -20,14 +20,6 @@ description of the task it names, and that PR either acts on it or says why not.
 - Record through `createInstruments(meter, { routes })` from `@riviera/telemetry/instruments`.
   `routes` is the list of registered route templates; `unmatched` is always allowed.
 
-## T021 (from T020)
-
-- Build the SLO dashboards with `dashboard`, `stat`, `timeseries`, `row` and `promName` /
-  `promSeries` from `packages/telemetry/src/dashboards/build.ts`, so every query names registry
-  metrics only; add each file to `write.ts` and run `make dashboards` (it runs Prettier too, so
-  the stale check compares parsed JSON). `dashboard()` fixes the time range to `now-1h`; give it
-  a parameter if the SLO dashboards need another one. Panels are two to a line.
-
 ## T016 (from T013)
 
 - The Common Ground mock answers 401 without `Authorization`, and T013's client sends the header

@@ -220,17 +220,19 @@ export interface DashboardSpec {
   readonly description: string;
   readonly tags: readonly string[];
   readonly panels: readonly PanelSpec[];
+  /** The default time range, e.g. `now-28d` for an SLO window; `now-1h` when omitted. */
+  readonly from?: string;
 }
 
 /** A provisioned, read-only dashboard (Grafana schema 41) over the Prometheus data source. */
 export function dashboard(spec: DashboardSpec): Dashboard {
-  const { panels, ...meta } = spec;
+  const { panels, from = "now-1h", ...meta } = spec;
   return {
     ...meta,
     editable: false,
     schemaVersion: 41,
     version: 1,
-    time: { from: "now-1h", to: "now" },
+    time: { from, to: "now" },
     refresh: "30s",
     timezone: "utc",
     graphTooltip: 1,
