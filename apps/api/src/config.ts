@@ -8,6 +8,47 @@ export interface Config {
   readonly logLevel: string;
 }
 
+type DeploymentEnvironment = "development" | "ci" | "production";
+
+/** A secret that never shows up when the config is logged, printed or serialised. */
+class Secret {
+  readonly #value: string;
+  constructor(value: string) {
+    this.#value = value;
+  }
+  reveal(): string {
+    return this.#value;
+  }
+  toString(): string {
+    return "[redacted]";
+  }
+  toJSON(): string {
+    return "[redacted]";
+  }
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return "[redacted]";
+  }
+}
+
+type SampleFlows =
+  | { readonly enabled: false }
+  | {
+      readonly enabled: true;
+      readonly commonGroundUrl: URL;
+      readonly discogsUrl: URL;
+      /** Dev-only credential for the Common Ground mock's Authorization header. */
+      readonly commonGroundDevApiKey: Secret | undefined;
+    };
+
+interface LoadedConfig extends Config {
+  readonly telemetry: {
+    /** OTLP/HTTP collector base URL; undefined turns telemetry export off (FR-019). */
+    readonly endpoint: URL | undefined;
+    readonly environment: DeploymentEnvironment;
+  };
+  readonly sampleFlows: SampleFlows;
+}
+
 export type Env = Readonly<Record<string, string | undefined>>;
 
 const LOG_LEVELS = new Set(["fatal", "error", "warn", "info", "debug", "trace", "silent"]);
@@ -18,6 +59,107 @@ function required(env: Env, name: string): string {
     throw new Error(`Missing required environment variable ${name}`);
   }
   return value;
+}
+
+/** Reads an optional variable; an empty or blank value counts as unset. */
+function optional(env: Env, name: string): string | undefined {
+  const value = env[name];
+  return value === undefined || value.trim() === "" ? undefined : value;
+}
+
+function parseHttpUrl(raw: string, name: string): URL {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error(`${name} must be an absolute URL, got "${raw}"`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`${name} must be an http or https URL, got "${raw}"`);
+  }
+  return url;
+}
+
+function parseEnvironment(raw: string | undefined): DeploymentEnvironment {
+  // Unset means production, so a forgotten variable fails closed (research R17).
+  if (raw === undefined || raw === "production") {
+    return "production";
+  }
+  if (raw === "development" || raw === "ci") {
+    return raw;
+  }
+  throw new Error(`DEPLOYMENT_ENVIRONMENT must be development, ci or production, got "${raw}"`);
+}
+
+function parseFlag(raw: string | undefined, name: string): boolean {
+  if (raw === undefined || raw === "false") {
+    return false;
+  }
+  if (raw === "true") {
+    return true;
+  }
+  throw new Error(`${name} must be "true" or "false", got "${raw}"`);
+}
+
+const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+/** Loopback or private-range IPv4, i.e. never a public address. */
+function isLocalIpv4(host: string): boolean {
+  const [a, b] = host.split(".").map(Number);
+  return (
+    a === 127 ||
+    a === 10 ||
+    (a === 172 && b !== undefined && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+/**
+ * The sample flows may only reach the local mocks (research R16, FR-013). discogs.com and its
+ * subdomains are refused by name; every other public host is refused too, which covers the
+ * Common Ground API host: a mock URL must be a single-label name (the compose service `mocks`),
+ * localhost, or a loopback or private address.
+ */
+function parseMockUrl(env: Env, name: string): URL {
+  const raw = optional(env, name);
+  if (raw === undefined) {
+    throw new Error(`${name} is required when SAMPLE_FLOWS_ENABLED=true`);
+  }
+  const url = parseHttpUrl(raw, name);
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "discogs.com" || host.endsWith(".discogs.com")) {
+    throw new Error(`${name} must point at the local mock, never discogs.com (got ${host})`);
+  }
+  const local =
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "[::1]" ||
+    (IPV4.test(host) ? isLocalIpv4(host) : !host.includes(".") && !host.startsWith("["));
+  if (!local) {
+    throw new Error(
+      `${name} must point at the local mock, not a public host such as Common Ground (got ${host})`,
+    );
+  }
+  return url;
+}
+
+function parseSampleFlows(env: Env, environment: DeploymentEnvironment): SampleFlows {
+  if (!parseFlag(optional(env, "SAMPLE_FLOWS_ENABLED"), "SAMPLE_FLOWS_ENABLED")) {
+    return { enabled: false };
+  }
+  // The sample route is unauthenticated, so it must never be live on the host (R17).
+  if (environment === "production") {
+    throw new Error(
+      "SAMPLE_FLOWS_ENABLED=true needs DEPLOYMENT_ENVIRONMENT set explicitly to development or ci",
+    );
+  }
+  const devKey = optional(env, "COMMON_GROUND_DEV_API_KEY");
+  return {
+    enabled: true,
+    commonGroundUrl: parseMockUrl(env, "COMMON_GROUND_URL"),
+    discogsUrl: parseMockUrl(env, "DISCOGS_URL"),
+    commonGroundDevApiKey: devKey === undefined ? undefined : new Secret(devKey),
+  };
 }
 
 function parsePort(raw: string, name: string): number {
@@ -39,7 +181,7 @@ function parseRole(raw: string | undefined): Role {
 }
 
 /** Reads and validates the process configuration. Throws on the first problem. */
-export function loadConfig(env: Env, roleArg: string | undefined): Config {
+export function loadConfig(env: Env, roleArg: string | undefined): LoadedConfig {
   const role = parseRole(roleArg);
   const portVar = role === "api" ? "PORT" : "WORKER_PORT";
   const defaultPort = role === "api" ? "3000" : "3001";
@@ -58,5 +200,22 @@ export function loadConfig(env: Env, roleArg: string | undefined): Config {
     throw new Error(`LOG_LEVEL must be one of ${[...LOG_LEVELS].join(", ")}`);
   }
 
-  return { role, port, databaseUrl: required(env, "DATABASE_URL"), appUrl, logLevel };
+  const endpointRaw = optional(env, "OTEL_EXPORTER_OTLP_ENDPOINT");
+  const environment = parseEnvironment(optional(env, "DEPLOYMENT_ENVIRONMENT"));
+
+  return {
+    role,
+    port,
+    databaseUrl: required(env, "DATABASE_URL"),
+    appUrl,
+    logLevel,
+    telemetry: {
+      endpoint:
+        endpointRaw === undefined
+          ? undefined
+          : parseHttpUrl(endpointRaw, "OTEL_EXPORTER_OTLP_ENDPOINT"),
+      environment,
+    },
+    sampleFlows: parseSampleFlows(env, environment),
+  };
 }

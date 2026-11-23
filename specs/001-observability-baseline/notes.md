@@ -19,11 +19,6 @@ description of the task it names, and that PR either acts on it or says why not.
 - The `DropWarning` line carries `time`, `service` and `env`, and is validated against
   `contracts/log-line.schema.json`.
 
-## T006 / T013
-
-- Name a dev-only Common Ground credential variable for the mock's `Authorization` header. It is
-  redacted and never sent to the browser.
-
 ## Spec follow-up (its own spec PR, not a task)
 
 - 001/FR-005 should say that secret words match whole words of a field name, plus the
