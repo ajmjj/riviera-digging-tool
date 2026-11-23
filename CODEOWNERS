@@ -1,0 +1,23 @@
+# Generated from ci/protected-paths.json. A unit test fails if the two drift apart.
+# GitHub does not let Antn approve PRs opened through his own account, so approval is
+# enforced by the human-gate check (see the constitution, Human Checkpoints).
+
+/.github/ @ajmjj
+/ci/ @ajmjj
+/CODEOWNERS @ajmjj
+/CLAUDE.md @ajmjj
+/.specify/ @ajmjj
+/.claude/ @ajmjj
+/contracts/ @ajmjj
+/eslint.config.js @ajmjj
+**/tsconfig*.json @ajmjj
+/vitest.config.ts @ajmjj
+/stryker.config.mjs @ajmjj
+/playwright.config.ts @ajmjj
+/knip.json @ajmjj
+/codegen.ts @ajmjj
+/.prettierrc.json @ajmjj
+/.prettierignore @ajmjj
+/.npmrc @ajmjj
+/.gitleaks.toml @ajmjj
+/.semgrepignore @ajmjj

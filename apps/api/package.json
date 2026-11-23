@@ -1,0 +1,17 @@
+{
+  "name": "@riviera/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/main.ts api",
+    "start:worker": "node src/main.ts worker"
+  },
+  "dependencies": {
+    "fastify": "5.12.8",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}

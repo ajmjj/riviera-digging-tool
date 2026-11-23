@@ -1,0 +1,13 @@
+pnpm-lock.yaml
+coverage/
+reports/
+dist/
+test-results/
+playwright-report/
+.stryker-tmp/
+packages/*/src/generated/
+contracts/
+.specify/
+.claude/
+docs/
+specs/**/*.md

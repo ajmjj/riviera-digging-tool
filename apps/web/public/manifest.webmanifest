@@ -1,0 +1,9 @@
+{
+  "name": "Riviera Dig",
+  "short_name": "Dig",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1b1a17",
+  "theme_color": "#1b1a17",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

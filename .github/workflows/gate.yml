@@ -1,0 +1,60 @@
+# Gate checks (constitution, Principle II and Human Checkpoints).
+#
+# `pull_request_target` runs this file and ci/ exactly as they are on main, never the PR's
+# versions, and nothing here checks out or runs code from the PR: the scripts read the PR
+# only through the GitHub API. So a PR can't rewrite the rules that judge it.
+name: Gate
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install: "false"
+      - name: Suppression and threshold guard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node ci/guard.ts
+
+  human-gate:
+    name: human-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write # only to remove human-approved after a new commit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install: "false"
+      - name: Antn's approval for protected paths and needs-human
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ACTION: ${{ github.event.action }}
+        run: node ci/human-gate.ts
