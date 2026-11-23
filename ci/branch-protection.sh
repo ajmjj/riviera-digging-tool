@@ -69,9 +69,11 @@ run gh api -X PATCH "repos/$REPO" \
   -F allow_squash_merge=true -F allow_merge_commit=false -F allow_rebase_merge=false \
   -F allow_auto_merge=true -F delete_branch_on_merge=true >/dev/null
 
-echo "2/5 Actions: read-only default token, Actions may not approve PRs"
+echo "2/5 Actions: read-only default token, Actions may not approve PRs, fork PRs wait for Antn"
 run gh api -X PUT "repos/$REPO/actions/permissions/workflow" \
   -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false
+run gh api -X PUT "repos/$REPO/actions/permissions/fork-pr-contributor-approval" \
+  -f approval_policy=all_external_contributors
 
 echo "3/5 Labels"
 run gh label create needs-human --repo "$REPO" --force --color B60205 \
