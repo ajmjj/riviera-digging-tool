@@ -15,6 +15,9 @@ This file only says how to work within it.
 
 - Write the test first, or with the code. Name requirements as `NNN/FR-###`, e.g.
   `it("002/FR-012: magic link expires after 15 minutes", …)`. FR numbers restart per spec.
+- Until all of a feature's requirements have tests (its spec PR and early task PRs), the
+  `fr-trace` check fails. Say so in the PR description and ask Antn for `approved-exception`;
+  never work around the check.
 - Don't edit a failing test to make it pass unless the spec changed; say which FR or spec
   change justifies any test change in the PR description.
 - Domain code (pricing, verdicts, dig order, sync reconciliation, taste profile) goes in

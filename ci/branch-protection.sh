@@ -19,7 +19,7 @@ DRY_RUN=false
 CHECKS=(
   static tests mutation stack security
   "analyze (javascript-typescript)" "analyze (actions)"
-  guard human-gate review
+  guard human-gate review fr-trace
 )
 
 checks_json=$(printf '%s\n' "${CHECKS[@]}" | jq -R '{context: ., integration_id: 15368}' | jq -s .)

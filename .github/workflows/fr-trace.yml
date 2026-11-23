@@ -1,0 +1,35 @@
+# Requirement traceability (constitution, Principle III). Its own workflow so it re-runs when
+# labels change: untested requirements pass only with Antn's approved-exception label.
+# It runs the PR's ci/ code, which is a protected path, so changing it needs human-gate.
+name: FR trace
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: fr-trace-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  fr-trace:
+    name: fr-trace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install: "false"
+      - name: Every due requirement has a test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node ci/fr-trace.ts
