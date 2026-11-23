@@ -113,6 +113,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup
+      # The browser install doesn't need the stack, so it runs in the background while the
+      # images build. Tests run headless only, so the headless shell is all they need.
+      - name: Start Playwright browser install (in the background)
+        run: |
+          # `|| status=$?` so a failed install still writes its exit code under `bash -e`.
+          ( status=0
+            pnpm exec playwright install --with-deps --only-shell chromium \
+              > "$RUNNER_TEMP/pw-install.log" 2>&1 || status=$?
+            echo "$status" > "$RUNNER_TEMP/pw-install.exit" ) &
       - name: Build every image
         run: |
           cp .env.example .env
@@ -124,8 +133,16 @@ jobs:
           docker compose ps
       - name: Smoke test
         run: node ci/smoke.ts
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Wait for the Playwright browser install
+        run: |
+          for _ in $(seq 300); do
+            [ -f "$RUNNER_TEMP/pw-install.exit" ] && break
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/pw-install.log"
+          [ -f "$RUNNER_TEMP/pw-install.exit" ] \
+            || { echo "Playwright install did not finish within 10 minutes."; exit 1; }
+          exit "$(cat "$RUNNER_TEMP/pw-install.exit")"
       - name: End-to-end tests (phone and laptop, axe)
         run: pnpm exec playwright test
       - name: Flake guard (e2e)
