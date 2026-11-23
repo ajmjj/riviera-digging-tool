@@ -136,6 +136,24 @@ describe("001/FR-012: one client span per outbound call", () => {
     });
   });
 
+  it("001/FR-012: the span is ended even when recording a metric throws", async () => {
+    const instruments = createInstruments(telemetry.telemetry.meterProvider.getMeter("t"), {
+      routes: [],
+    });
+    const failing = createExternalClient({
+      instruments: {
+        ...instruments,
+        add: () => {
+          throw new TypeError("recorder failed");
+        },
+      },
+      fetch: () => Promise.resolve(Response.json(SHOP)),
+    });
+    const cg = createCommonGround({ client: failing, url: MOCKS, apiKey: undefined });
+    await expect(cg.sampleShopConfig()).rejects.toThrow("recorder failed");
+    expect((await onlySpan()).name).toBe("common_ground SampleShopConfig");
+  });
+
   it("001/FR-012: the inlined document equals the codegen-validated .graphql file", () => {
     const path = "../../../packages/common-ground/operations/admin/SampleShopConfig.graphql";
     const file = readFileSync(new URL(path, import.meta.url), "utf8");

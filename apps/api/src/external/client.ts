@@ -118,22 +118,26 @@ export function createExternalClient(options: ExternalClientOptions): ExternalCl
       const result = await context.with(trace.setSpan(context.active(), span), () =>
         attempt(request),
       );
-      const labels = { service, operation, outcome: result.outcome };
-      options.instruments.add("riviera.external.calls", 1, labels);
-      options.instruments.record("riviera.external.duration", (now() - started) / 1000, labels);
+      const seconds = (now() - started) / 1000;
 
       if (result.status !== undefined) {
         span.setAttribute("http.response.status_code", result.status);
       }
       span.setAttribute("riviera.external.rate_limited", result.outcome === "rate_limited");
+      if (result.outcome !== "success") {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: `${name}: ${result.reason}` });
+      }
+      // Ended before the metrics are recorded, so a throwing recorder can't leave it open.
+      span.end();
+
+      const labels = { service, operation, outcome: result.outcome };
+      options.instruments.add("riviera.external.calls", 1, labels);
+      options.instruments.record("riviera.external.duration", seconds, labels);
+
       if (result.outcome === "success") {
-        span.end();
         return result.value;
       }
-      const message = `${name}: ${result.reason}`;
-      span.setStatus({ code: SpanStatusCode.ERROR, message });
-      span.end();
-      throw new ExternalCallError(message, result.outcome, result.status);
+      throw new ExternalCallError(`${name}: ${result.reason}`, result.outcome, result.status);
     },
   };
 }
