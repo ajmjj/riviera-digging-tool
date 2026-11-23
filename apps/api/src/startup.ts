@@ -28,7 +28,8 @@ export async function startService(
 
   let stopping: Promise<void> | undefined;
   const stop = (): Promise<void> => {
-    stopping ??= app.close().then(() => db.close());
+    // The pool closes even if closing the server fails.
+    stopping ??= app.close().finally(() => db.close());
     return stopping;
   };
   signals.once("SIGTERM", () => void stop());
