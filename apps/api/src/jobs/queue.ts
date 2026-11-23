@@ -14,7 +14,7 @@ import { z } from "zod";
 import { isStaffId } from "../staff-id.ts";
 
 /** Registered job names: exactly the `job_name` label values of the job metrics. */
-type JobName = LabelsOf<"riviera.jobs.failures">["job_name"];
+export type JobName = LabelsOf<"riviera.jobs.failures">["job_name"];
 
 const JOBS = {
   "sample.discogs_release": z.strictObject({
@@ -23,13 +23,27 @@ const JOBS = {
   }),
 } satisfies Record<JobName, z.ZodType>;
 
-type JobPayload<N extends JobName> = z.infer<(typeof JOBS)[N]>;
+export type JobPayload<N extends JobName> = z.infer<(typeof JOBS)[N]>;
 
 function isJobName(value: string): value is JobName {
   return Object.hasOwn(JOBS, value);
 }
 
-const JOB_NAMES: readonly JobName[] = Object.keys(JOBS).filter(isJobName);
+export const JOB_NAMES: readonly JobName[] = Object.keys(JOBS).filter(isJobName);
+
+/** Issue paths only: the issues could quote payload values. */
+function issuePaths(error: z.ZodError): string {
+  return error.issues.map((issue) => issue.path.join(".") || "(root)").join(", ");
+}
+
+/** Validates a stored payload against its job's schema before a run (data-model.md §2). */
+export function parsePayload<N extends JobName>(name: N, payload: unknown): JobPayload<N> {
+  const parsed = JOBS[name].safeParse(payload);
+  if (!parsed.success) {
+    throw new TypeError(`invalid payload for ${name} at ${issuePaths(parsed.error)}`);
+  }
+  return parsed.data;
+}
 
 /** The part of `pg.Pool` the queue uses; any pool or client will do. */
 interface Queryable {
@@ -43,7 +57,7 @@ interface EnqueueOptions {
   readonly staffId?: string;
 }
 
-interface ClaimedJob {
+export interface ClaimedJob {
   readonly id: string;
   readonly name: JobName;
   /** As stored; the runner validates it against the job's schema before running. */
@@ -137,7 +151,7 @@ interface ClaimRow {
 }
 
 /** W3C `traceparent` of a span context. */
-function traceparentOf(span: Span): string {
+export function traceparentOf(span: Span): string {
   const { traceId, spanId, traceFlags } = span.spanContext();
   return `00-${traceId}-${spanId}-${traceFlags.toString(16).padStart(2, "0")}`;
 }
@@ -153,9 +167,7 @@ function validate(name: JobName, payload: unknown, options: EnqueueOptions): num
   }
   const parsed = JOBS[name].safeParse(payload);
   if (!parsed.success) {
-    // Paths only: the issues could quote payload values.
-    const paths = parsed.error.issues.map((issue) => issue.path.join(".") || "(root)");
-    throw new TypeError(`enqueue: invalid payload for ${name} at ${paths.join(", ")}`);
+    throw new TypeError(`enqueue: invalid payload for ${name} at ${issuePaths(parsed.error)}`);
   }
   if (options.staffId !== undefined && !isStaffId(options.staffId)) {
     throw new TypeError("enqueue: staffId must be a pseudonymous staff ID");
