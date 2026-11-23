@@ -150,7 +150,8 @@ function checkLabels(
   }
   const attributes: Attributes = {};
   for (const [key, value] of Object.entries(given)) {
-    const values = def.labels[key];
+    // Own keys only, so an inherited name such as `constructor` is an unknown label too.
+    const values = Object.hasOwn(def.labels, key) ? def.labels[key] : undefined;
     if (values === undefined) {
       throw new TypeError(`${def.name}: unknown label ${key}`);
     }
