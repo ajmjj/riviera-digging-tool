@@ -122,7 +122,7 @@ describe("createInstruments", () => {
     expect(metric(metrics, "riviera.queue.depth").dataPoints[0]?.value).toBe(3);
   });
 
-  it("001/FR-018: histograms use the registry's bucket boundaries", async () => {
+  it("001/FR-014, 001/FR-017: histograms use the registry's bucket boundaries", async () => {
     const { instruments, collect } = setup();
     instruments.record("riviera.verdict.duration", 0.31);
     instruments.record("riviera.http.server.duration", 0.3, {
@@ -172,6 +172,8 @@ describe("createInstruments", () => {
       ["riviera.jobs.failures", 1, "job_name", /labels must be an object/],
       ["riviera.jobs.failures", 1, null, /missing label job_name/],
       ["riviera.checkout.started", 1, { outcome: "paid" }, /unknown label outcome/],
+      ["riviera.checkout.started", 1, { constructor: "x" }, /unknown label constructor/],
+      ["riviera.checkout.started", 1, { toString: "x" }, /unknown label toString/],
       [
         "riviera.queue.depth",
         1,
