@@ -54,7 +54,9 @@ export interface TelemetryPluginOptions {
 /**
  * Adds the telemetry hooks. Register it before any route: route templates are collected as
  * routes are added and become the closed `route` label set when the app is ready, so a 404 flood
- * adds one `unmatched` series, never one per raw path.
+ * adds one `unmatched` series, never one per raw path. A route the hook never saw (registered
+ * earlier, or in a sibling scope) is counted as `unmatched` too, rather than rejected; its span
+ * still carries the real template.
  */
 export function registerTelemetry(app: FastifyInstance, options: TelemetryPluginOptions): void {
   const routes = new Set<string>();
@@ -98,6 +100,17 @@ export function registerTelemetry(app: FastifyInstance, options: TelemetryPlugin
     context.with(trace.setSpan(parent, span), done);
   });
 
+  // A client that disconnects before the response gets no onResponse: end the span here, so the
+  // request still leaves a trace (without a status code), and record no metric point.
+  app.addHook("onRequestAbort", (request, done) => {
+    const span = active.get(request);
+    if (span !== undefined) {
+      active.delete(request);
+      span.end();
+    }
+    done();
+  });
+
   app.addHook("onError", (request, _reply, error, done) => {
     active.get(request)?.recordException(error);
     done();
@@ -120,8 +133,9 @@ export function registerTelemetry(app: FastifyInstance, options: TelemetryPlugin
     const method = knownMethod(request.method);
     // A method outside the closed label set has no series; its span still records it.
     if (method !== undefined) {
+      const route = request.routeOptions.url;
       instruments?.record("riviera.http.server.duration", reply.elapsedTime / 1000, {
-        route: request.routeOptions.url ?? UNMATCHED_ROUTE,
+        route: route !== undefined && routes.has(route) ? route : UNMATCHED_ROUTE,
         method,
         status_class: statusClass(code),
       });

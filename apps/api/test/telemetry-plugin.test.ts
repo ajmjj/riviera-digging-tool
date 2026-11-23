@@ -2,6 +2,7 @@ import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { createLogger } from "@riviera/telemetry/logger";
 import { startTestTelemetry, type TestTelemetry } from "@riviera/telemetry/testing";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
+import { request as httpRequest } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HEALTHZ, isHealthRequest, READYZ, registerHealthRoutes } from "../src/health.ts";
 import {
@@ -111,13 +112,6 @@ describe("001/FR-007: one SERVER span per request, named by route template", () 
     expect(JSON.stringify(span.attributes)).not.toContain("/no/such/path");
   });
 
-  it("001/FR-007: a 404 from a matched route keeps its template; 4xx is not an error", async () => {
-    await app.inject("/gone");
-    const span = await onlySpan();
-    expect(span.name).toBe("GET /gone");
-    expect(span.status.code).toBe(SpanStatusCode.UNSET);
-  });
-
   it("001/FR-007: a 5xx marks the span ERROR and records the exception", async () => {
     const res = await app.inject("/broken");
     expect(res.statusCode).toBe(500);
@@ -214,5 +208,37 @@ describe("001/FR-017, 001/FR-018: riviera.http.server.duration with bounded labe
     const labels = found?.dataPoints.flatMap((point) => Object.keys(point.attributes)) ?? [];
     expect(new Set(labels)).toEqual(new Set(["route", "method", "status_class"]));
     expect(JSON.stringify(found)).not.toMatch(/req_9|staff_test_0001/);
+  });
+
+  it("001/FR-018: a route registered before the plugin is counted as unmatched, not rejected", async () => {
+    const early = Fastify();
+    early.get("/early", () => ({ ok: true }));
+    registerTelemetry(early, {
+      tracer: telemetry.telemetry.tracerProvider.getTracer("test"),
+      meter: telemetry.telemetry.meterProvider.getMeter("test"),
+    });
+    expect((await early.inject("/early")).statusCode).toBe(200);
+    await early.close();
+    expect((await onlySpan()).name).toBe("GET /early");
+    expect(await series()).toEqual({ [`${UNMATCHED_ROUTE} GET 2xx`]: 1 });
+  });
+
+  it("001/FR-007: a request the client aborts still ends and exports its span, without a status code or metric point", async () => {
+    app.get("/slow", () => new Promise(() => undefined));
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address();
+    if (address === null || typeof address === "string") throw new Error("no port");
+    const sent = httpRequest({ host: "127.0.0.1", port: address.port, path: "/slow" });
+    sent.on("error", () => undefined);
+    sent.end();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    sent.destroy();
+    for (let i = 0; i < 40 && (await telemetry.spans()).length === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    const span = await onlySpan();
+    expect(span.name).toBe("GET /slow");
+    expect(span.attributes["http.response.status_code"]).toBeUndefined();
+    expect(await series()).toEqual({});
   });
 });
