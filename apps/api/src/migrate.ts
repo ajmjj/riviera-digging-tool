@@ -56,6 +56,9 @@ async function withLock<T>(
   work: (client: pg.Client, applied: ReadonlySet<number>) => Promise<T>,
 ): Promise<T> {
   const client = new pg.Client({ connectionString });
+  // A lost connection rejects the pending query; without a listener its `error` event would
+  // also crash the process.
+  client.on("error", () => undefined);
   await client.connect();
   try {
     // Session-level lock: a second api or worker starting at the same time waits here.
@@ -86,17 +89,30 @@ async function inTransaction(
     await record();
     await client.query("COMMIT");
   } catch (error) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // The connection is gone, so the transaction is too; report the original error.
+    }
     throw new Error(`Migration ${label} failed`, { cause: error });
   }
 }
 
-/** Applies every migration not yet recorded, in order, one transaction each. Returns their versions. */
+/**
+ * Applies every migration not yet recorded, in order, one transaction each. Returns their
+ * versions. Refuses to start when the database records a version that isn't on disk, i.e. it
+ * was migrated by a newer image: running older code against it could corrupt data.
+ */
 export async function migrateUp(
   connectionString: string,
   migrations: readonly Migration[],
 ): Promise<number[]> {
   return withLock(connectionString, async (client, applied) => {
+    const known = new Set(migrations.map((m) => m.version));
+    const unknown = [...applied].filter((version) => !known.has(version)).sort((a, b) => a - b);
+    if (unknown.length > 0) {
+      throw new Error(`schema_migration has versions not on disk: ${unknown.join(", ")}`);
+    }
     const done: number[] = [];
     for (const m of migrations) {
       if (applied.has(m.version)) {

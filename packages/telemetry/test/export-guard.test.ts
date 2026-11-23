@@ -1,5 +1,12 @@
 import { readFileSync } from "node:fs";
-import { diag, SpanStatusCode, trace } from "@opentelemetry/api";
+import {
+  diag,
+  logs,
+  ROOT_CONTEXT,
+  SeverityNumber,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
 import { ExportResultCode, type ExportResult } from "@opentelemetry/core";
 import {
   AggregationTemporality,
@@ -279,5 +286,50 @@ describe("span redaction at export", () => {
     const value = (await harness.spans())[0]?.attributes["riviera.text"];
     expect(typeof value === "string" && value.endsWith(TRUNCATION_MARKER)).toBe(true);
     expect(typeof value === "string" && Buffer.byteLength(value)).toBeLessThan(8300);
+  });
+});
+
+describe("log record redaction at export", () => {
+  let harness: TestTelemetry | undefined;
+  afterEach(async () => {
+    await harness?.shutdown();
+    harness = undefined;
+  });
+
+  it("001/FR-005: a log record emitted around the logger is still redacted and truncated", async () => {
+    harness = startTestTelemetry();
+    const token = ["abc", "DEF", "123", "xyz", "789"].join("");
+    const email = ["staff", "example.com"].join("@");
+    logs.getLogger("test").emit({
+      eventName: `mail ${email}`,
+      severityNumber: SeverityNumber.WARN,
+      severityText: "warn",
+      body: `sent to ${email}`,
+      attributes: { password: "hunter2", note: `Bearer ${token}`, long: "x".repeat(9000), n: 1 },
+    });
+    const [record, ...others] = await harness.logs();
+    expect(others).toEqual([]);
+    expect(record).toMatchObject({
+      eventName: `mail ${REDACTED}`,
+      severityNumber: SeverityNumber.WARN,
+      severityText: "warn",
+      body: `sent to ${REDACTED}`,
+      attributes: { password: REDACTED, note: REDACTED, n: 1 },
+    });
+    const long = record?.attributes["long"];
+    expect(typeof long === "string" && long.endsWith(TRUNCATION_MARKER)).toBe(true);
+  });
+
+  it("001/FR-005: a record without body or event name keeps its trace context", async () => {
+    harness = startTestTelemetry();
+    const span = trace.getTracer("test").startSpan("work");
+    logs
+      .getLogger("test")
+      .emit({ attributes: { n: 1 }, context: trace.setSpan(ROOT_CONTEXT, span) });
+    span.end();
+    const [record] = await harness.logs();
+    expect(record?.body).toBeUndefined();
+    expect(record?.eventName).toBeUndefined();
+    expect(record?.spanContext).toEqual(span.spanContext());
   });
 });
