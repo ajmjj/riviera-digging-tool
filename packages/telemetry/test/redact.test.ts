@@ -189,6 +189,19 @@ describe("redaction of free text", () => {
     expect(redactText(`Error: not found`)).toBe(`Error: not found`);
   });
 
+  it("001/FR-005: a quoted authorization value is redacted up to its closing quote", () => {
+    const token = ["abc", "DEF", "123", "xyz"].join("");
+    expect(redactText(`{"authorization":"Bearer x","user_id":1}`)).toBe(
+      `{"authorization":"${REDACTED}","user_id":1}`,
+    );
+    expect(redactText(`{"Authorization": "Token ${token} x", "n": 2}`)).toBe(
+      `{"Authorization": "${REDACTED}", "n": 2}`,
+    );
+    expect(redactText(`proxy_authorization='Digest a=1, b=2' next=3`)).toBe(
+      `proxy_authorization='${REDACTED}' next=3`,
+    );
+  });
+
   it("001/FR-005: leaves look-alikes that carry no secret unchanged", () => {
     const texts =
       "Basic validation failed|the bearer of news|status_code=500|GET /x?sort=a&page=3|a@b";
