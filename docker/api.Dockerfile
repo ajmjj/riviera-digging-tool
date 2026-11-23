@@ -25,6 +25,7 @@ COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY package.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/api/src apps/api/src
+COPY apps/api/migrations apps/api/migrations
 COPY packages/telemetry/package.json packages/telemetry/
 COPY packages/telemetry/src packages/telemetry/src
 USER node
