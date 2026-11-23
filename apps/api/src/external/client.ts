@@ -3,18 +3,17 @@
 // active span, and `riviera.external.calls` and `riviera.external.duration` by service,
 // operation and outcome. Bodies, headers, URLs and upstream error text are never recorded.
 
-import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import { context, diag, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Instruments, LabelsOf } from "@riviera/telemetry/instruments";
+import type { Secret } from "../config.ts";
 
 type Labels = LabelsOf<"riviera.external.calls">;
 type Failure = Exclude<Labels["outcome"], "success">;
 
 const EXTERNAL_TIMEOUT_MS = 5000;
 
-/** A credential handed out only on request, like config's `Secret`; revealed into headers only. */
-export interface ApiKey {
-  readonly reveal: () => string;
-}
+/** A credential handed out only on request (config's `Secret`); revealed into headers only. */
+export type ApiKey = Pick<Secret, "reveal">;
 
 interface ExternalRequest<T> {
   readonly service: Labels["service"];
@@ -127,12 +126,17 @@ export function createExternalClient(options: ExternalClientOptions): ExternalCl
       if (result.outcome !== "success") {
         span.setStatus({ code: SpanStatusCode.ERROR, message: `${name}: ${result.reason}` });
       }
-      // Ended before the metrics are recorded, so a throwing recorder can't leave it open.
       span.end();
 
+      // Telemetry never fails the call (001/FR-020): a recorder error goes to diag, whose
+      // warnings the export guard rate-limits, and the call's own result stands.
       const labels = { service, operation, outcome: result.outcome };
-      options.instruments.add("riviera.external.calls", 1, labels);
-      options.instruments.record("riviera.external.duration", seconds, labels);
+      try {
+        options.instruments.add("riviera.external.calls", 1, labels);
+        options.instruments.record("riviera.external.duration", seconds, labels);
+      } catch {
+        diag.warn(`${name}: external call metrics not recorded`);
+      }
 
       if (result.outcome === "success") {
         return result.value;

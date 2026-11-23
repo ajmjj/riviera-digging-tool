@@ -11,7 +11,7 @@ export interface Config {
 type DeploymentEnvironment = "development" | "ci" | "production";
 
 /** A secret that never shows up when the config is logged, printed or serialised. */
-class Secret {
+export class Secret {
   readonly #value: string;
   constructor(value: string) {
     this.#value = value;

@@ -136,7 +136,7 @@ describe("001/FR-012: one client span per outbound call", () => {
     });
   });
 
-  it("001/FR-012: the span is ended even when recording a metric throws", async () => {
+  it("001/FR-020: a throwing metric recorder neither fails the call nor leaves the span open", async () => {
     const instruments = createInstruments(telemetry.telemetry.meterProvider.getMeter("t"), {
       routes: [],
     });
@@ -150,7 +150,7 @@ describe("001/FR-012: one client span per outbound call", () => {
       fetch: () => Promise.resolve(Response.json(SHOP)),
     });
     const cg = createCommonGround({ client: failing, url: MOCKS, apiKey: undefined });
-    await expect(cg.sampleShopConfig()).rejects.toThrow("recorder failed");
+    await expect(cg.sampleShopConfig()).resolves.toEqual(SHOP.data);
     expect((await onlySpan()).name).toBe("common_ground SampleShopConfig");
   });
 
