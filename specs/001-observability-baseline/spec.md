@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-23
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "Read docs/digging-tool-handoff.md and the constitution. Specify the observability baseline before any business features exist: structured logs with staff and request/job context, distributed traces across HTTP requests and background jobs (including outbound calls to Common Ground and Discogs, mocked), metrics for every SLO in the constitution, a local OpenTelemetry Collector + Loki + Tempo + Prometheus + Grafana stack that developers can run with Docker Compose, and one dashboard per SLO. Acceptance: a sample request and a sample background job are both visible end to end as a trace in Grafana, with linked logs and metrics, and every SLO dashboard exists."
 
@@ -26,6 +26,16 @@ binding constraints, not as design choices.
   see what a request or job did.
 - **Operator**: Antn, running the tool on his machine. Needs to see whether the tool meets its
   SLOs and to find the cause when it doesn't.
+
+## Clarifications
+
+### Session 2026-11-23
+
+- Q: When a background job fails and is retried, does the job-failure metric count every failed attempt or only jobs that give up for good? → A: Every failed attempt counts once; job runs are also counted by outcome.
+- Q: Should requests to the health endpoints also be left out of HTTP metrics and per-request logs, not only traces? → A: Yes: health requests produce no spans, no HTTP metric points and no per-request log lines; failures are still logged.
+- Q: Over what period should each SLO dashboard measure its current value and remaining error budget? → A: A rolling 28-day window; metrics are kept for at least 30 days.
+- Q: How should CI decide that a stopped collector doesn't slow requests? → A: p95 with the collector stopped ≤ the larger of 1.10 × p95 with it running, or p95 with it running + 5 ms.
+- Q: Must the observability images pass the same CI vulnerability scan as the app's own images? → A: Yes: the observability images go through the same image vulnerability scan as the app's images, with the same failure rule.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -170,7 +180,8 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 - A client sends a trace context header: the request joins that trace only if the header is
   valid; a malformed header starts a new trace.
 - A background job fails partway: the job span records the error and its duration, the
-  failure metric counts it once, and any retry is a new span in the same trace.
+  failure metric counts that failed attempt once, and any retry is a new span in the same
+  trace (whose own failure, if any, counts once more).
 - A job is enqueued with no originating request (for example a scheduled job): it starts its
   own trace.
 - The mocked Common Ground or Discogs answers HTTP 429: the client span and the outbound-call
@@ -204,7 +215,9 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 - **FR-005**: Before any log line or span attribute is written, the system MUST redact
   authorization headers, cookies, values of fields whose names indicate secrets (such as
   password, token, secret, key, authorization, cookie), email addresses, and bearer or token
-  strings, replacing each with a fixed redaction marker.
+  strings, replacing each with a fixed redaction marker. Field names are matched regardless of
+  letter case and word separators, so `adminKey`, `admin_key`, `Admin-Key` and `ADMIN_KEY` are all
+  treated as secret names.
 - **FR-006**: Log messages and attribute values longer than 8 KB MUST be truncated, with a
   marker showing that truncation happened.
 
@@ -212,7 +225,9 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 
 - **FR-007**: Every incoming HTTP request MUST produce a server span recording the method,
   route template (not the raw path with IDs), response status and duration. Requests to the
-  health endpoints MUST NOT produce spans, so healthchecks don't flood traces.
+  health endpoints MUST NOT produce spans, HTTP metric points or per-request log lines, so
+  healthchecks don't flood traces, dashboards or logs; a failing health check (for example the
+  database unreachable) is still logged.
 - **FR-008**: Every database query made while handling a request or job MUST produce a child
   span recording the operation, without parameter values.
 - **FR-009**: Every background job run MUST produce a span recording the job name, job ID,
@@ -236,10 +251,11 @@ stopped, and check that the smoke test passes and requests are not slowed notice
   that records it exists. The registry MUST make the catalog check in CI pass for real.
 - **FR-015**: The system MUST record Common Ground and Discogs calls as one counter by service
   and outcome (success, failed, rate-limited), and their duration.
-- **FR-016**: The system MUST record background job runs by job name and outcome, their
-  duration, job failures, and current queue depth.
+- **FR-016**: The system MUST record background job runs (every attempt) by job name and
+  outcome, their duration, job failures, and current queue depth. Each failed attempt counts
+  as exactly one job failure, whether or not it will be retried.
 - **FR-017**: The system MUST record HTTP server requests by route, method and status class,
-  and their duration.
+  and their duration, excluding the health endpoints (FR-007).
 - **FR-018**: Metric labels MUST NOT include staff IDs, request IDs, job IDs or any other
   unbounded value, so the number of time series stays bounded.
 
@@ -254,7 +270,8 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 - **FR-021**: The repository MUST provide a local observability stack (OpenTelemetry Collector,
   Loki, Tempo, Prometheus and Grafana) in Docker Compose behind a profile named
   `observability`, off by default. Every service in it MUST have a healthcheck, bind only to
-  127.0.0.1, and come up healthy within the constitution's 120-second startup limit.
+  127.0.0.1, and come up healthy within the constitution's 120-second startup limit. Its images
+  MUST pass the same image vulnerability scan as the app's images.
 - **FR-022**: Grafana MUST come pre-provisioned with its data sources and dashboards, with no
   manual setup, and MUST link traces to logs (by trace ID), logs to traces, and traces to the
   related request and job metrics.
@@ -265,7 +282,9 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 
 - **FR-024**: Grafana MUST provide exactly one dashboard per SLO in the constitution (seven),
   generated from or checked against the SLO catalog, each showing the SLO's target, its current
-  measured value over the SLO window, and the remaining error budget.
+  measured value over the SLO window (a rolling 28 days), and the remaining error budget over
+  that window. Locally stored metrics MUST be kept for at least 30 days so the window is
+  complete.
 - **FR-025**: An SLO dashboard whose metrics have no recorded data MUST say that no data has
   been recorded yet, rather than show a value.
 - **FR-026**: Grafana MUST also provide one service overview dashboard: request rate, errors
@@ -325,7 +344,8 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 - **SC-005**: Zero occurrences of the planted email addresses, tokens, cookies and secrets in
   emitted telemetry across the redaction test suite.
 - **SC-006**: With the collector stopped, the smoke test still passes and p95 latency of the
-  sample request rises by no more than 10% compared with the collector running.
+  sample request is no higher than the larger of 110% of, or 5 ms above, its p95 with the
+  collector running.
 - **SC-007**: The full stack with the observability profile becomes healthy within 120 seconds
   on the CI runner.
 
