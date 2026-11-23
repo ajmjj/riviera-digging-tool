@@ -6,6 +6,7 @@
   "exports": {
     "./instruments": "./src/instruments.ts",
     "./logger": "./src/logger.ts",
+    "./redact": "./src/redact.ts",
     "./sdk": "./src/sdk.ts",
     "./slo-metrics": "./src/slo-metrics.ts",
     "./testing": "./src/testing.ts"
