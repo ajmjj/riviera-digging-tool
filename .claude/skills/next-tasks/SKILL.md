@@ -78,9 +78,14 @@ Carry forward these notes (put each in the PR description of the task that does 
   and include the size in the approved-exception request.
 - <each carry-forward note for this task>
 - <later tasks' notes, verbatim, so they keep travelling>
+Watch the PR after opening it, and keep watching it until it is merged or closed: fix CI
+failures and blocking review findings, reply on review threads, and tell me when it only waits
+on my labels.
 Don't push for non-blocking review findings; batch them into the next needed push.
-Watch the PR after opening it.
 ```
+
+Every start prompt MUST include the "Watch the PR" lines above. Never drop them, even when
+shortening a prompt.
 
 For the task this session will merge first, keep the "restart the branch" line. For a task that collides with an earlier one, add a line telling it to merge `main` back in once that task's PR has merged.
 
