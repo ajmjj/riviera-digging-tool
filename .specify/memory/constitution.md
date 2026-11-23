@@ -290,4 +290,4 @@ either label.
   `approved-exception` label from Antn, recorded in the PR.
 - Runtime guidance for agents lives in `CLAUDE.md`, and it MUST NOT contradict this file.
 
-**Version**: 1.0.0 | **Ratified**: PENDING (set to the approval date when Antn approves the first PR) | **Last Amended**: 2026-11-23
+**Version**: 1.0.0 | **Ratified**: 2026-11-23 | **Last Amended**: 2026-11-23
