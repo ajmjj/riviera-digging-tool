@@ -173,6 +173,37 @@ describe("service overview dashboard", () => {
     }
   });
 
+  it("001/FR-026: each query's labels and label values belong to the metric it queries", () => {
+    const defs = new Map(
+      registry.flatMap((def): [string, InstrumentDef][] => {
+        const base = prometheusName(def);
+        const names =
+          def.kind === "histogram" ? ["bucket", "count", "sum"].map((s) => `${base}_${s}`) : [base];
+        return names.map((name) => [name, def]);
+      }),
+    );
+    for (const expr of exprs) {
+      const metrics = identifiers(expr).filter((word) => defs.has(word));
+      expect(metrics.length, expr).toBe(1);
+      const [metric = ""] = metrics;
+      const labels = defs.get(metric)?.labels ?? {};
+      const known = (key: string): boolean =>
+        Object.hasOwn(labels, key) || (key === "le" && metric.endsWith("_bucket"));
+      for (const [, list = ""] of expr.matchAll(/\bby \(([^)]*)\)/g)) {
+        for (const key of list.split(", ")) {
+          expect(known(key), `${key} in ${expr}`).toBe(true);
+        }
+      }
+      for (const [, key = "", value = ""] of expr.matchAll(/(\w+)="([^"]*)"/g)) {
+        const values = labels[key];
+        expect(
+          Array.isArray(values) && values.includes(value),
+          `${key}="${value}" in ${expr}`,
+        ).toBe(true);
+      }
+    }
+  });
+
   it("001/FR-026: queue depth is always `max by (job_name)`", () => {
     for (const expr of exprs.filter((entry) => entry.includes("riviera_queue_depth"))) {
       expect(expr).toBe("max by (job_name) (riviera_queue_depth)");
