@@ -4,9 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./instruments": "./src/instruments.ts",
     "./slo-metrics": "./src/slo-metrics.ts"
   },
+  "dependencies": {
+    "@opentelemetry/api": "1.10.0"
+  },
   "devDependencies": {
+    "@opentelemetry/sdk-metrics": "3.1.1",
     "fast-check": "4.11.0"
   }
 }
