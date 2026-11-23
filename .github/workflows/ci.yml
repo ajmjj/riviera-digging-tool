@@ -113,13 +113,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(jq -r '.devDependencies["@playwright/test"]' package.json)" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       # The browser install doesn't need the stack, so it runs in the background while the
       # images build. Tests run headless only, so the headless shell is all they need.
+      # No --with-deps: ubuntu-24.04 already has the shell's libraries, and the extra fonts
+      # and Mesa upgrades it pulled took 2 to 7 minutes from a slow apt mirror.
       - name: Start Playwright browser install (in the background)
         run: |
           # `|| status=$?` so a failed install still writes its exit code under `bash -e`.
           ( status=0
-            pnpm exec playwright install --with-deps --only-shell chromium \
+            pnpm exec playwright install --only-shell chromium \
               > "$RUNNER_TEMP/pw-install.log" 2>&1 || status=$?
             echo "$status" > "$RUNNER_TEMP/pw-install.exit" ) &
       - name: Build every image
