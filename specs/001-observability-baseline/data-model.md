@@ -79,7 +79,8 @@ interface InstrumentDef {
 
 Validation (unit tests): `SLO_METRIC_NAMES` (the `slo`- or `minimum`-tagged names) equals
 `requiredMetrics(catalog)` exactly, and the service instruments of research R6 are the only others; every label value set is a closed list (`route` is closed by
-the registered routes plus `unmatched`); no label is named like `staff_id`, `request_id`, `job_id`,
+the registered routes plus `unmatched`; `method` of `riviera.http.server.duration` is `GET`, `HEAD`, `POST`, `PUT`,
+`PATCH`, `DELETE`, `OPTIONS` plus `_OTHER`, which counts any other method, as in the semantic conventions); no label is named like `staff_id`, `request_id`, `job_id`,
 `trace_id` or `email` (FR-018); every histogram used by a latency SLO has a bucket boundary at its
 threshold. The full list of instruments is in [contracts/telemetry.md](./contracts/telemetry.md#metrics).
 
