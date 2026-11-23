@@ -70,7 +70,7 @@ export interface Runner {
   runOnce(): Promise<boolean>;
   /** Starts the poll loop; calling it again does nothing. */
   start(): void;
-  /** Stops polling and resolves once the running attempt, if any, has finished. */
+  /** Stops polling and resolves once every running attempt (poll loop or `runOnce`) has finished. */
   stop(): Promise<void>;
 }
 
@@ -108,6 +108,8 @@ export function createRunner(options: RunnerOptions): Runner {
   const idle = new AbortController();
   let loop: Promise<void> | undefined;
   let stopping = false;
+  // Attempts still running, from the poll loop or a direct `runOnce()`; `stop()` waits for them.
+  const running = new Set<Promise<void>>();
 
   const attempt = async (job: ClaimedJob): Promise<void> => {
     const origin = spanContextOf(job.originTraceparent);
@@ -134,19 +136,26 @@ export function createRunner(options: RunnerOptions): Runner {
       ...(job.staffId === null ? {} : { staff_id: job.staffId }),
     });
     // The heartbeat in flight, if any; awaited before the outcome is stored, so a heartbeat that
-    // lands after `complete`/`fail` can't report a lease lost for an attempt that finished.
-    let beating: Promise<void> = Promise.resolve();
+    // lands after `complete`/`fail` can't report a lease lost for an attempt that finished. A tick
+    // that comes while one is still in flight (a slow database) is skipped, so there is never more
+    // than one and awaiting `beating` covers them all.
+    let beating: Promise<void> | undefined;
     const heartbeat = setInterval(() => {
-      beating = queue.heartbeat(job.id, job.attempt).then(
-        (owned) => {
-          if (!owned) {
-            runLog.warn("job lease lost");
-          }
-        },
-        (error: unknown) => {
-          runLog.warn({ error: errorMessage(error) }, "job heartbeat failed");
-        },
-      );
+      beating ??= queue
+        .heartbeat(job.id, job.attempt)
+        .then(
+          (owned) => {
+            if (!owned) {
+              runLog.warn("job lease lost");
+            }
+          },
+          (error: unknown) => {
+            runLog.warn({ error: errorMessage(error) }, "job heartbeat failed");
+          },
+        )
+        .finally(() => {
+          beating = undefined;
+        });
     }, heartbeatMs);
     const started = now();
     let failure: { error: unknown } | undefined;
@@ -200,7 +209,13 @@ export function createRunner(options: RunnerOptions): Runner {
     if (job === undefined) {
       return false;
     }
-    await attempt(job);
+    const run = attempt(job);
+    running.add(run);
+    try {
+      await run;
+    } finally {
+      running.delete(run);
+    }
     return true;
   };
 
@@ -223,6 +238,7 @@ export function createRunner(options: RunnerOptions): Runner {
     stopping = true;
     idle.abort();
     await loop;
+    await Promise.allSettled(running);
   };
 
   options.signals?.once("SIGTERM", () => void stop());

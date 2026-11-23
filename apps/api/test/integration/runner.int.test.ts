@@ -391,6 +391,55 @@ describe("001/FR-009: the poll loop", () => {
     expect(lines.filter((l) => l["level"] === "warn")).toEqual([]);
   });
 
+  it("001/FR-009: a heartbeat slower than its interval is never overlapped and lands before complete", async () => {
+    const order: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let calls = 0;
+    const worker = runner(() => sleep(60), {
+      heartbeatMs: 10,
+      queue: {
+        ...queue,
+        heartbeat: async (id, attempt) => {
+          calls += 1;
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          // The first heartbeat stalls past the end of the attempt; any later one would be fast.
+          await sleep(calls === 1 ? 100 : 1);
+          inFlight -= 1;
+          order.push("heartbeat");
+          return queue.heartbeat(id, attempt);
+        },
+        complete: (id, attempt, traceParent) => {
+          order.push("complete");
+          return queue.complete(id, attempt, traceParent);
+        },
+      },
+    });
+    const { id } = await queue.enqueue(NAME, PAYLOAD);
+    await worker.runOnce();
+    expect(maxInFlight).toBe(1);
+    expect(order.at(-1)).toBe("complete");
+    await sleep(120); // a heartbeat left behind would land, and warn, by now
+    expect(order.at(-1)).toBe("complete");
+    expect(lines.filter((l) => l["level"] === "warn")).toEqual([]);
+    expect(await row(id)).toMatchObject({ status: "succeeded" });
+  });
+
+  it("001/FR-009: stop() waits for an attempt started with runOnce()", async () => {
+    let started = false;
+    const worker = runner(async () => {
+      started = true;
+      await sleep(50);
+    });
+    const { id } = await queue.enqueue(NAME, PAYLOAD);
+    const once = worker.runOnce();
+    await until(() => started);
+    await worker.stop();
+    expect(await row(id)).toMatchObject({ status: "succeeded" });
+    expect(await once).toBe(true);
+  });
+
   it("001/FR-009: a lost lease, a failing heartbeat and a stale complete are logged", async () => {
     let beat = 0;
     const worker = runner(
