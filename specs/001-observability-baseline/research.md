@@ -170,10 +170,12 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
 ## R11. Trivy now scans the observability images (spec clarification Q5, FR-021)
 
 - **Decision**: the CI image scan iterates
-  `docker compose --profile observability config --images`, so upstream observability
-  images are held to the same "no fixable high/critical" rule.
-- **Risk**: an upstream image with a fixable high CVE blocks CI until upstream ships a fix or
-  we bump the pin. Accepting that is consistent with the constitution; the alternative
+  `docker compose --profile dev --profile observability config --images`, so upstream
+  observability images go through exactly the same Trivy step as the app's images (same
+  severity rule and flags as `.github/workflows/ci.yml` uses today; this feature doesn't change
+  them).
+- **Risk**: an upstream image with a high or critical finding blocks CI until upstream ships a
+  fix or we bump the pin. Accepting that is consistent with the constitution; the alternative
   (excluding them) would be a loosened gate and needs Antn.
 
 ## R12. Job queue: Postgres table, `FOR UPDATE SKIP LOCKED`, lease
