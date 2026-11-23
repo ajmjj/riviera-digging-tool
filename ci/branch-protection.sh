@@ -102,7 +102,8 @@ fi
 cat <<'EOF'
 
 Done. Still to do by hand, once:
-  - Add the repository secret ANTHROPIC_API_KEY (Settings > Secrets and variables > Actions),
-    and the same key under Dependabot secrets, for the independent reviewer.
+  - Run `claude setup-token` and add the result as the repository secret
+    CLAUDE_CODE_OAUTH_TOKEN (Settings > Secrets and variables > Actions), and again under
+    Dependabot secrets, for the independent reviewer. It uses your Claude subscription.
   - Check Settings > Rules > Rulesets shows "main is CI-only" as Active with no bypass list.
 EOF

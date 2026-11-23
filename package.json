@@ -22,7 +22,6 @@
     "check": "pnpm format && pnpm lint && pnpm typecheck && pnpm knip && pnpm fr-trace && pnpm test:coverage"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "1.12.0",
     "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
     "@graphql-codegen/cli": "8.0.0",
