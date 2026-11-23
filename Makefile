@@ -1,4 +1,4 @@
-.PHONY: help env up down logs ps smoke check test-integration up-observability up-dev down-observability
+.PHONY: help env up down logs ps smoke check test-integration up-observability up-dev down-observability dashboards
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -49,3 +49,9 @@ test-integration: ## All tests with coverage against a throwaway Postgres on 127
 		-p 127.0.0.1:55432:5432 $(TEST_DB_IMAGE) >/dev/null
 	until docker exec riviera-testdb pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
 	DATABASE_URL=$(TEST_DB_URL) pnpm test:coverage; status=$$?; docker rm -f riviera-testdb >/dev/null; exit $$status
+
+DASHBOARDS_DIR := observability/grafana/dashboards
+
+dashboards: ## Regenerate the Grafana dashboards JSON (commit the result)
+	node packages/telemetry/src/dashboards/write.ts
+	pnpm exec prettier --write --log-level warn $(DASHBOARDS_DIR)

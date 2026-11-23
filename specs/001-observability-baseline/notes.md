@@ -22,6 +22,14 @@ description of the task it names, and that PR either acts on it or says why not.
 - `riviera.queue.depth` reports 0 for every registered job name with no queued rows (research
   R18); `observe()` reports only what its callback passes to `report`, so T017 fills in the zeros.
 
+## T021 (from T020)
+
+- Build the SLO dashboards with `dashboard`, `stat`, `timeseries`, `row` and `promName` /
+  `promSeries` from `packages/telemetry/src/dashboards/build.ts`, so every query names registry
+  metrics only; add each file to `write.ts` and run `make dashboards` (it runs Prettier too, so
+  the stale check compares parsed JSON). `dashboard()` fixes the time range to `now-1h`; give it
+  a parameter if the SLO dashboards need another one. Panels are two to a line.
+
 ## T024 (from T014 / T015)
 
 - R11: `docker compose --profile dev --profile observability config --images` lists the locally
