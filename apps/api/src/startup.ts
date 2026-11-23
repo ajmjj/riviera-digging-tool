@@ -38,7 +38,7 @@ export interface Service {
   stop(): Promise<void>;
 }
 
-/** Runs every step, in order, even after one fails; rejects with the first failure (001/FR-020). */
+/** Runs every step, in order, even after one fails; rejects with the first failure. */
 async function closeEach(steps: readonly (() => Promise<void> | undefined)[]): Promise<void> {
   const failures: unknown[] = [];
   for (const step of steps) {
