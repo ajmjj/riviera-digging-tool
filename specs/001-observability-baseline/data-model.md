@@ -59,8 +59,9 @@ Bookkeeping table `schema_migration(version int PK, name text, applied_at timest
 
 ## 3. Metric registry — `InstrumentDef` (`packages/telemetry/src/slo-metrics.ts`)
 
-One `as const` array of instrument definitions; `SLO_METRIC_NAMES` is derived from it and is
-what `ci/slo-check.ts` imports. The file has no runtime imports, so plain `node` can load it from
+One `as const` array of instrument definitions (catalog and service instruments); `SLO_METRIC_NAMES`
+is derived from it as the names of the **catalog** instruments only (those with `slo` or `minimum`
+set) and is what `ci/slo-check.ts` imports. The file has no runtime imports, so plain `node` can load it from
 the repository root.
 
 ```ts
@@ -72,11 +73,12 @@ interface InstrumentDef {
   labels: Record<string, readonly string[] | "route">; // allowed values per label
   buckets?: readonly number[];         // histograms only
   slo?: string;                        // catalog SLO id, if it feeds one
+  minimum?: true;                      // one of the catalog's minimumMetrics
 }
 ```
 
-Validation (unit tests): the set of `slo`-tagged names plus the minimum metrics equals
-`requiredMetrics(catalog)` exactly; every label value set is a closed list (`route` is closed by
+Validation (unit tests): `SLO_METRIC_NAMES` (the `slo`- or `minimum`-tagged names) equals
+`requiredMetrics(catalog)` exactly, and the service instruments of research R6 are the only others; every label value set is a closed list (`route` is closed by
 the registered routes plus `unmatched`); no label is named like `staff_id`, `request_id`, `job_id`,
 `trace_id` or `email` (FR-018); every histogram used by a latency SLO has a bucket boundary at its
 threshold. The full list of instruments is in [contracts/telemetry.md](./contracts/telemetry.md#metrics).

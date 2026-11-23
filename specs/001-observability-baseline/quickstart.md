@@ -117,7 +117,7 @@ Expected: every step `PASS` (FR-033).
 ## Clean up
 
 ```bash
-docker compose --profile observability down --volumes
+docker compose --profile dev --profile observability down --volumes
 ```
 
 Telemetry data is discarded with the volumes (FR-023).

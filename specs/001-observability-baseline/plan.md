@@ -41,6 +41,7 @@ definitions and the job table in [data-model.md](./data-model.md); the external 
   `@opentelemetry/context-async-hooks` 3.1.1, `@opentelemetry/core` 3.1.1,
   `@opentelemetry/resources` 3.1.1, `@opentelemetry/semantic-conventions` 1.45.0, and the three
   OTLP/HTTP exporters (`exporter-{trace,metrics,logs}-otlp-http` 0.301.2).
+- Each dependency is added by the task that first imports it, so knip never sees an unused one.
 - New dev dependencies: `fast-check` 4.11.0 (first property test: redaction), `yaml` 2.9.1
   (tests that read `docker-compose.yml` and the collector/Grafana configs).
 - No auto-instrumentation packages (see research R1).

@@ -346,7 +346,8 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
 - **Grafana access**: anonymous `Viewer` on 127.0.0.1 only; admin password from `.env`
   (`GRAFANA_ADMIN_PASSWORD`), default only in `.env.example`.
 - **Spec clarifications**: `/speckit-clarify` ran on 2026-11-23 after this plan was first
-  drafted (five questions, recorded in spec.md → Clarifications). The answers confirmed R13's
+  drafted (five questions, recorded in spec.md → Clarifications; a sixth, on FR-014, followed in
+  ajmjj/riviera-digging-tool#10, which must merge before this plan). The answers confirmed R13's
   failure counting, the health-route exclusion and the 28-day window, tightened R15 to the
   clarified SC-006 rule and made R11 a spec requirement. The clarified spec goes to Antn
   for approval on its own (Human Checkpoint 2, ajmjj/riviera-digging-tool#8) before this
