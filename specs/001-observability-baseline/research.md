@@ -212,10 +212,13 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
   - later attempts: children of that first-attempt span, also linked to the producer — so
     retries are new spans in the same trace (edge case), and the job trace is navigable to
     the request trace in Tempo's "Links" panel.
-  - if the first attempt crashed (its lease expired, R12), its span was never exported, so the
-    sweep clears `job.trace_parent`; the next attempt then starts a new root span (still linked
-    to the producer) and stores its own context. Retries never hang off a parent that doesn't
-    exist in Tempo.
+  - if the first attempt crashed (its lease expired, R12), its span was never exported, so it
+    must not leave a `job.trace_parent` behind; the next attempt then starts a new root span
+    (still linked to the producer) and stores its own context. To make that hold without
+    tracking which attempt wrote the column, an attempt's context is stored together with its
+    outcome (`complete`/`fail` in T008, `COALESCE`, so the first one stored wins): a crashed
+    attempt never reaches that write, so the sweep has nothing to clear. Retries never hang off
+    a parent that doesn't exist in Tempo.
   - no originating request (scheduled jobs): no producer link; the first attempt starts its
     own trace.
 - **Failure metric** (spec clarification Q1, FR-016): `riviera.jobs.failures` counts failed **attempts** (once

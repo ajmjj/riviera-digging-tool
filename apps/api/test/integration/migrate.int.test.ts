@@ -100,6 +100,34 @@ describe("001/FR-029: migration runner (real Postgres)", () => {
     expect(await versions()).toEqual([1]);
   });
 
+  it("001/FR-029: a failed ROLLBACK still reports the migration that failed", async () => {
+    // Ending its own connection makes the migration fail and the ROLLBACK after it fail too.
+    const lost: Migration = {
+      version: 2,
+      name: "lost",
+      up: "SELECT pg_terminate_backend(pg_backend_pid())",
+      down: "",
+    };
+    const run = migrateUp(db.url, [...shipped, lost]);
+    await expect(run).rejects.toThrow("Migration 2_lost up failed");
+    await expect(run).rejects.toHaveProperty("cause.code", "57P01");
+    expect(await versions()).toEqual([1]);
+  });
+
+  it("001/FR-029: refuses to start when the database has versions not on disk", async () => {
+    const newer: Migration = {
+      version: 2,
+      name: "newer",
+      up: "CREATE TABLE newer (id int)",
+      down: "DROP TABLE newer",
+    };
+    await migrateUp(db.url, [...shipped, newer]);
+    await expect(migrateUp(db.url, shipped)).rejects.toThrow(
+      "schema_migration has versions not on disk: 2",
+    );
+    expect(await versions()).toEqual([1, 2]);
+  });
+
   it("001/FR-029: a migration directory on disk runs end to end", async () => {
     const dir = await mkdtemp(join(tmpdir(), "migrations-"));
     try {
