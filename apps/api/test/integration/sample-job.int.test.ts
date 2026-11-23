@@ -1,9 +1,11 @@
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { createLogger } from "@riviera/telemetry/logger";
 import { memoryExporters } from "@riviera/telemetry/testing";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { Secret } from "../../src/config.ts";
+import { sampleDiscogsRelease } from "../../src/sample/job.ts";
 import { startService, type Service, type ServiceConfig } from "../../src/startup.ts";
 import { freshDatabase, type FreshDatabase } from "./fresh-database.ts";
 
@@ -162,5 +164,14 @@ describe("001/FR-028 001/FR-031: the worker runs the sample job", () => {
     ]);
     expect(points("riviera.jobs.failures", ["job_name"])).toEqual({ "sample.discogs_release": 1 });
     expect(points("riviera.jobs.runs", ["outcome"])).toEqual({ failed: 1 });
+  });
+
+  it("001/FR-028: without sample flows a stray sample job fails instead of calling Discogs", async () => {
+    const log = createLogger({ service: "riviera-worker", env: "ci", level: "silent" });
+    const run = { id: "stray", attempt: 1, log };
+    const handler = sampleDiscogsRelease(undefined);
+    await expect(handler({ releaseId: RELEASE_ID, fail: false }, run)).rejects.toThrow(
+      "sample flows are off",
+    );
   });
 });
