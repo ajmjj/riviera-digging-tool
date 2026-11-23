@@ -4,8 +4,8 @@ export interface HealthDeps {
   readonly pingDatabase: () => Promise<void>;
 }
 
-const HEALTHZ = "/healthz";
-const READYZ = "/readyz";
+export const HEALTHZ = "/healthz";
+export const READYZ = "/readyz";
 const HEALTH_ROUTES: ReadonlySet<string> = new Set([HEALTHZ, READYZ]);
 
 /**

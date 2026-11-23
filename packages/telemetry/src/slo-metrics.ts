@@ -37,7 +37,9 @@ export const INSTRUMENTS = [
     description: "HTTP server request duration, health endpoints excluded.",
     labels: {
       route: "route",
-      method: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      // `_OTHER` (semantic conventions) counts any other method, so every request is recorded
+      // (001/FR-017) and the set stays closed (001/FR-018).
+      method: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "_OTHER"],
       status_class: ["1xx", "2xx", "3xx", "4xx", "5xx"],
     },
     buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.3, 0.5, 1, 2.5, 5],

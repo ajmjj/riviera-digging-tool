@@ -15,11 +15,6 @@ description of the task it names, and that PR either acts on it or says why not.
   run-together compound names (e.g. `ADMINKEY`) that T002 also matches. Research R4 already
   assumes the whole-word rule.
 
-## T010 / T013 / T017 / T020 (from T003)
-
-- Record through `createInstruments(meter, { routes })` from `@riviera/telemetry/instruments`.
-  `routes` is the list of registered route templates; `unmatched` is always allowed.
-
 ## T016 (from T013)
 
 - The Common Ground mock answers 401 without `Authorization`, and T013's client sends the header
