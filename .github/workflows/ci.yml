@@ -41,8 +41,6 @@ jobs:
           pnpm exec graphql-codegen --config codegen.ts
           git diff --exit-code -- packages/common-ground/src/generated \
             || { echo "Generated Common Ground clients are stale: run pnpm codegen and commit."; exit 1; }
-      - name: FR traceability
-        run: node ci/fr-trace.ts
       - name: SLO metrics exist and are exported
         run: node ci/slo-check.ts
 

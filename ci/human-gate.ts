@@ -13,13 +13,18 @@ const owner = String(prop(config, "owner"));
 const protectedPaths = stringList(prop(config, "paths"), "ci/protected-paths.json paths");
 
 let labels = labelNames(await gh.get(`/repos/${gh.repo}/issues/${number}`));
-if (action === "synchronize" && labels.includes(LABELS.approved)) {
-  await gh.send(
-    "DELETE",
-    `/repos/${gh.repo}/issues/${number}/labels/${encodeURIComponent(LABELS.approved)}`,
-  );
-  labels = labels.filter((l) => l !== LABELS.approved);
-  console.log(`New commit pushed: removed "${LABELS.approved}". Antn has to approve again.`);
+// Both approvals cover only the commits Antn saw: every new commit removes them.
+if (action === "synchronize") {
+  for (const label of [LABELS.approved, LABELS.exception]) {
+    if (labels.includes(label)) {
+      await gh.send(
+        "DELETE",
+        `/repos/${gh.repo}/issues/${number}/labels/${encodeURIComponent(label)}`,
+      );
+      labels = labels.filter((l) => l !== label);
+      console.log(`New commit pushed: removed "${label}". Antn has to approve again.`);
+    }
+  }
 }
 
 const timeline = await gh.getAll(`/repos/${gh.repo}/issues/${number}/timeline`);

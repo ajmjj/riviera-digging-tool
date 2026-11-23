@@ -59,6 +59,9 @@ of fixing the code.
   number in front: `NNN/FR-###`, for example `it("002/FR-012: …")`.
 - CI MUST fail the build if any FR has no test, or if any test names an FR that does not
   exist.
+- While a feature's tests don't exist yet (its spec PR and its task PRs before the last), a PR
+  may pass the untested-FR part of this check only with Antn's `approved-exception` label.
+  References to FRs that don't exist never pass.
 
 Rationale: traceability is how a reader with no time to read the code can still check that
 every requirement is exercised and nothing unasked-for was built.
@@ -290,4 +293,4 @@ either label.
   `approved-exception` label from Antn, recorded in the PR.
 - Runtime guidance for agents lives in `CLAUDE.md`, and it MUST NOT contradict this file.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-23 | **Last Amended**: 2026-11-23
+**Version**: 1.1.0 | **Ratified**: 2026-11-23 | **Last Amended**: 2026-11-23
