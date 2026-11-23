@@ -36,6 +36,7 @@ binding constraints, not as design choices.
 - Q: Over what period should each SLO dashboard measure its current value and remaining error budget? → A: A rolling 28-day window; metrics are kept for at least 30 days.
 - Q: How should CI decide that a stopped collector doesn't slow requests? → A: p95 with the collector stopped ≤ the larger of 1.10 × p95 with it running, or p95 with it running + 5 ms.
 - Q: Must the observability images pass the same CI vulnerability scan as the app's own images? → A: Yes: the observability images go through the same image vulnerability scan as the app's images, with the same failure rule.
+- Q: What does "exported" in FR-014 mean for metrics that have no meaningful value before their first observation? → A: Counters are exported from startup, starting at zero; histograms and timestamp gauges are registered at startup and exported from their first observation.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -247,8 +248,10 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 **Metrics**
 
 - **FR-014**: Every metric listed in the SLO catalog (constitution Principle VII and
-  `ci/slo-catalog.json`) MUST be registered at startup and exported, even before the feature
-  that records it exists. The registry MUST make the catalog check in CI pass for real.
+  `ci/slo-catalog.json`) MUST be registered at startup, even before the feature that records it
+  exists. Counters MUST be exported from startup, starting at zero. Histograms and timestamp
+  gauges, which have no meaningful value before their first observation, MUST be exported from
+  that first observation. The registry MUST make the catalog check in CI pass for real.
 - **FR-015**: The system MUST record Common Ground and Discogs calls as one counter by service
   and outcome (success, failed, rate-limited), and their duration.
 - **FR-016**: The system MUST record background job runs (every attempt) by job name and
@@ -340,7 +343,8 @@ stopped, and check that the smoke test passes and requests are not slowed notice
   Discogs spans), its link back to the request, and its log lines within 30 seconds.
 - **SC-003**: All 7 SLO dashboards and the overview dashboard exist on first start of the
   observability stack, with no manual steps.
-- **SC-004**: 100% of the SLO catalog's metrics are registered and exported, as checked in CI.
+- **SC-004**: 100% of the SLO catalog's metrics are registered and exported as FR-014 defines,
+  as checked in CI.
 - **SC-005**: Zero occurrences of the planted email addresses, tokens, cookies and secrets in
   emitted telemetry across the redaction test suite.
 - **SC-006**: With the collector stopped, the smoke test still passes and p95 latency of the
