@@ -215,7 +215,9 @@ stopped, and check that the smoke test passes and requests are not slowed notice
 - **FR-005**: Before any log line or span attribute is written, the system MUST redact
   authorization headers, cookies, values of fields whose names indicate secrets (such as
   password, token, secret, key, authorization, cookie), email addresses, and bearer or token
-  strings, replacing each with a fixed redaction marker.
+  strings, replacing each with a fixed redaction marker. Field names are matched regardless of
+  letter case and word separators, so `adminKey`, `admin_key`, `Admin-Key` and `ADMIN_KEY` are all
+  treated as secret names.
 - **FR-006**: Log messages and attribute values longer than 8 KB MUST be truncated, with a
   marker showing that truncation happened.
 
