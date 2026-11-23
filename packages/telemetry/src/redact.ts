@@ -23,8 +23,8 @@ const SECRET_COMPOUNDS: readonly string[] = (
   "sharedkey sessionkey sessionid authkey authheader setcookie passwd credential authorization"
 ).split(" ");
 
-// An authorization value can hold several words (`Token …`, `Digest …`), so it is redacted to
-// the end of the line.
+// An unquoted authorization value can hold several words (`Token …`, `Digest …`), so it is
+// redacted to the end of the line.
 const LINE_VALUE_NAMES: ReadonlySet<string> = new Set(["authorization", "proxyauthorization"]);
 
 // R4: query or `name=value` parameters that carry secrets without a secret word in the name.
@@ -109,12 +109,14 @@ function redactParams(text: string): string {
     }
     let end: number;
     const quote = text.charAt(start);
-    if (LINE_VALUE_NAMES.has(name.toLowerCase().replace(/[^a-z]/g, ""))) {
-      LINE_END.lastIndex = start;
-      end = LINE_END.exec(text)?.index ?? text.length;
-    } else if (quote === '"' || quote === "'") {
+    // A quoted value ends at its closing quote, an authorization one included:
+    // `{"authorization":"Token x","user_id":1}` keeps `"user_id":1`.
+    if (quote === '"' || quote === "'") {
       start += 1;
       end = closingQuote(text, quote, start);
+    } else if (LINE_VALUE_NAMES.has(name.toLowerCase().replace(/[^a-z]/g, ""))) {
+      LINE_END.lastIndex = start;
+      end = LINE_END.exec(text)?.index ?? text.length;
     } else {
       PARAM_VALUE_END.lastIndex = start;
       end = PARAM_VALUE_END.exec(text)?.index ?? text.length;

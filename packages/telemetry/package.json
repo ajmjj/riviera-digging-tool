@@ -5,13 +5,26 @@
   "type": "module",
   "exports": {
     "./instruments": "./src/instruments.ts",
-    "./slo-metrics": "./src/slo-metrics.ts"
+    "./sdk": "./src/sdk.ts",
+    "./slo-metrics": "./src/slo-metrics.ts",
+    "./testing": "./src/testing.ts"
   },
   "dependencies": {
-    "@opentelemetry/api": "1.10.0"
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/context-async-hooks": "3.1.1",
+    "@opentelemetry/core": "3.1.1",
+    "@opentelemetry/exporter-logs-otlp-http": "0.301.2",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.301.2",
+    "@opentelemetry/exporter-trace-otlp-http": "0.301.2",
+    "@opentelemetry/resources": "3.1.1",
+    "@opentelemetry/sdk-logs": "3.1.1",
+    "@opentelemetry/sdk-metrics": "3.1.1",
+    "@opentelemetry/sdk-trace": "3.1.1",
+    "@opentelemetry/semantic-conventions": "1.45.0"
   },
   "devDependencies": {
-    "@opentelemetry/sdk-metrics": "3.1.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "fast-check": "4.11.0"
   }
 }
