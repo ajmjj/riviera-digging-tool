@@ -219,8 +219,10 @@ stopped, and check that the smoke test passes and requests are not slowed notice
   strings, replacing each with a fixed redaction marker. Secret words match whole words of a
   field name, regardless of letter case and word separators, so `adminKey`, `admin_key`,
   `Admin-Key` and `ADMIN_KEY` are all treated as secret names while `keyboard` and `monkey` are
-  not. Common compound secret names written run together without separators (such as
-  `ADMINKEY`, `privatekey`) are treated as secret names too.
+  not. A name is also secret if it contains `password`, `secret` or `token` anywhere
+  (`accesstoken`, `clientsecret`), or one of the run-together compound secret names listed in
+  research R4 (such as `ADMINKEY`, `privatekey`); that list is the authority, so narrowing it is a
+  spec change.
 - **FR-006**: Log messages and attribute values longer than 8 KB MUST be truncated, with a
   marker showing that truncation happened.
 
