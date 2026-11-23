@@ -1,0 +1,2360 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+"""
+Mark types, fields, inputs, enums, etc. that should not appear in the generated API reference documentation.
+Examples: internal-only helpers, experimental fields, admin/internal types you don’t want exposed in public docs.
+"""
+directive @docIgnore on FIELD_DEFINITION | OBJECT | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION | SCALAR
+
+directive @cacheControl(maxAge: Int, scope: CacheControlScope, inheritMaxAge: Boolean) on FIELD_DEFINITION | OBJECT | INTERFACE | UNION
+
+"""
+Shows the documentation generator how to organize top-level types into API reference categories (e.g. "Orders", "Products", "Admin").
+Intended for top-level objects only; do not apply to individual fields.
+"""
+directive @doc(category: String!) on OBJECT | INTERFACE | UNION | INPUT_OBJECT | ENUM | SCALAR | FIELD_DEFINITION
+
+enum CacheControlScope {
+  PUBLIC
+  PRIVATE
+}
+
+"""Represents arbitrary JSON data as a scalar value."""
+scalar JSON @doc(category: "Common")
+
+"""
+Represents a date and time value, serialized as a timestamp in milliseconds.
+"""
+scalar Date @doc(category: "Common")
+
+"""Search engine optimization metadata for a page or resource."""
+type SeoEntry @doc(category: "Common") {
+  """Whether search engines should index this page."""
+  index: Boolean
+  """Meta description for search engine results."""
+  description: String
+  """URL-friendly slug for the page."""
+  slug: String
+  """SEO title for search engine results and browser tabs."""
+  title: String
+}
+
+"""Pagination metadata for paginated query results."""
+type Pagination @doc(category: "Common") {
+  """Number of items per page."""
+  limit: Int
+  """Total number of items across all pages."""
+  count: Int
+  """Current page number."""
+  page: Int!
+  """Total number of pages."""
+  pages: Int!
+  """Field name used for sorting."""
+  sort: String
+  """Sort order (1 for ascending, -1 for descending)."""
+  order: Int
+  """Whether there are more pages available."""
+  hasMore: Boolean
+}
+
+"""Input parameters for pagination and sorting."""
+input PaginationInput @doc(category: "Common") {
+  """
+  Number of items per page. Your requested size is used if it does not exceed the server-enforced maximum limit.
+  """
+  limit: Int
+  """The requested page number. Defaults to 1 if not specified."""
+  page: Int
+  """Field name to sort by."""
+  sort: String
+  """Sort order (1 for ascending, -1 for descending)."""
+  order: Int
+}
+
+"""A specific format variant of a media file with dimensions and URL."""
+type MediaFormat @doc(category: "Common") {
+  """Internal database identifier."""
+  _id: ID
+  """Name of the format variant."""
+  name: String
+  """File size in bytes."""
+  size: Int
+  """URL to access the formatted media file."""
+  url: String
+  """Width of the media in pixels."""
+  width: Int
+  """Height of the media in pixels."""
+  height: Int
+}
+
+"""Collection of different format variants for a media file."""
+type MediaFormats @doc(category: "Common") {
+  """Thumbnail-sized format variant."""
+  thumbnail: MediaFormat
+  """Banner-sized format variant."""
+  banner: MediaFormat
+  """Square format variant."""
+  square: MediaFormat
+  """Small-sized format variant."""
+  small: MediaFormat
+  """Large-sized format variant."""
+  large: MediaFormat
+}
+
+"""Represents a media file with metadata and multiple format variants."""
+type Media @doc(category: "Common") {
+  """Internal database identifier."""
+  _id: ID
+  """Numeric identifier for the media item."""
+  id: Int
+  """Title of the media file."""
+  title: String
+  """File extension."""
+  ext: String
+  """URL to access the original media file."""
+  url: String
+  """File size in bytes."""
+  size: Int
+  """Width of the media in pixels."""
+  width: Int
+  """Height of the media in pixels."""
+  height: Int
+  """Caption text for the media."""
+  caption: String
+  """MIME type of the media file."""
+  mime: String
+  """Alternative text for accessibility."""
+  alt: String
+  """Date when the media was created."""
+  created: Date
+  """Array of all available format variants."""
+  formatArray: [MediaFormat!]
+  """Organized collection of format variants by size."""
+  formats: MediaFormats
+}
+
+"""Shop-specific description content in multiple formats."""
+type ShopDescriptions @doc(category: "Common") {
+  """Plain text description."""
+  text: String
+  """HTML-formatted description."""
+  html: String
+  """Short summary description."""
+  short: String
+}
+
+"""Item descriptions in multiple formats for display purposes."""
+type Descriptions @doc(category: "Common") {
+  """Main description text."""
+  main: String!
+  """Shop-specific description variants."""
+  shop: ShopDescriptions
+}
+
+"""Pricing information for a listing."""
+type Prices @doc(category: "Items") {
+  """Current sale price."""
+  sale: Float!
+  """Price before taxes are applied."""
+  beforeTaxes: Float
+  """Original price for comparison (strikethrough price)."""
+  compare: Float
+}
+
+"""Stock quantity information for a listing."""
+type Stock @doc(category: "Items") {
+  """
+  Available quantity in stock. Null means stock is not tracked (always available).
+  """
+  quantity: Int
+}
+
+"""A product option variant (e.g., size, color)."""
+type Option @doc(category: "Items") {
+  """Name of the option (e.g., "Size", "Color")."""
+  name: String!
+  """Value of the option (e.g., "Large", "Red")."""
+  value: String!
+}
+
+"""
+A listing represents a specific variant of an item available for purchase.
+"""
+type Listing @doc(category: "Items") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the listing."""
+  id: Float!
+  """Pricing information for this listing."""
+  prices: Prices!
+  """Stock quantity information."""
+  stock: Stock!
+  """Date when the item becomes available for purchase."""
+  available: Date
+  """Whether this is a pre-order listing."""
+  preOrder: Boolean
+  """Whether this is a second-hand item."""
+  secondHand: Boolean
+  """Categories this listing belongs to."""
+  categories: [String!]!
+  """Product option variants for this listing."""
+  options: [Option!]!
+  """Whether only one item per customer is allowed."""
+  onePerCustomer: Boolean
+  """Additional comments or notes about the listing."""
+  comments: String
+}
+
+"""Artist information associated with an item."""
+type ItemArtist @doc(category: "Items") {
+  """Artist name."""
+  name: String!
+  """Artist name variation (ANV - Artist Name Variation)."""
+  anv: String
+  """External identifier for the artist."""
+  id: Float
+  """Join phrase connecting multiple artists."""
+  join: String
+}
+
+"""Label information associated with an item."""
+type ItemLabel @doc(category: "Items") {
+  """Label name."""
+  name: String!
+  """Label name variation (ANV)."""
+  anv: String
+  """External identifier for the label."""
+  id: Float
+  """Catalog number assigned by the label."""
+  catno: String
+}
+
+"""Alternative image representation."""
+type ImageAlternative @doc(category: "Items") {
+  """URI to the alternative image."""
+  uri: String
+}
+
+"""Image associated with an item."""
+type Image @doc(category: "Items") {
+  """URI to the image."""
+  uri: String
+  """Alternative image representation."""
+  alternative: ImageAlternative
+}
+
+"""Format information for a release item."""
+type ReleaseFormat @doc(category: "Items") {
+  """Format descriptions (e.g., "Vinyl", "LP", "Album")."""
+  descriptions: [String!]!
+  """Format name."""
+  name: String
+  """Quantity of items in this format."""
+  qty: String
+  """Full format description text."""
+  text: String
+}
+
+"""Track information for a release item."""
+type Track @doc(category: "Items") {
+  """Track type (e.g., "heading", "track")."""
+  type_: String
+  """Artists credited on this track."""
+  artists: [ItemArtist!]!
+  """Track duration."""
+  duration: String
+  """Track position on the release."""
+  position: String
+  """Track title."""
+  title: String
+  """URI to track audio or additional information."""
+  uri: String
+}
+
+"""Video associated with an item."""
+type ItemVideo @doc(category: "Items") {
+  """URI to the video."""
+  uri: String
+}
+
+"""Industry identifier for a book item (e.g., ISBN, ASIN)."""
+type BookIndustryIdentifier @doc(category: "Items") {
+  """Type of identifier (e.g., "ISBN_13", "ASIN")."""
+  type: String
+  """The identifier value."""
+  identifier: String
+}
+
+"""Generic identifier for an item (e.g., barcode, catalog number)."""
+type ItemIdentifier @doc(category: "Items") {
+  """Type of identifier."""
+  type: String
+  """Description of the identifier."""
+  description: String
+  """The identifier value."""
+  value: String
+}
+
+"""
+Detailed data and metadata for an item, including release, book, or product information.
+"""
+type ItemData @doc(category: "Items") {
+  """
+  Identifiers associated with the item (e.g., barcodes, catalog numbers).
+  """
+  identifiers: [ItemIdentifier!]
+  """Title of the item."""
+  title: String
+  """Artists associated with the item."""
+  artists: [ItemArtist!]
+  """Labels associated with the item."""
+  labels: [ItemLabel!]
+  """Category classification."""
+  cat: String
+  """Item type (e.g., "release", "book", "product")."""
+  type: String
+  """Manufacturer name."""
+  manufacturer: String
+  """External identifier from the marketplace system."""
+  discogsId: Float
+  """Link to associated digital asset."""
+  assetLink: String
+  """Images associated with the item."""
+  images: [Image!]!
+  """Weight of the item."""
+  weight: Float
+  """Musical genres associated with the item."""
+  genres: [String!]
+  """Musical styles associated with the item."""
+  styles: [String!]
+  """Track listing for release items."""
+  tracklist: [Track!]
+  """Format information for release items."""
+  formats: [ReleaseFormat!]
+  """Country of origin or release."""
+  country: String
+  """Release date for release items."""
+  releaseDate: Date
+  """Videos associated with the item."""
+  videos: [ItemVideo]
+  """Subtitle for book items."""
+  subtitle: String
+  """Authors for book items."""
+  authors: [String]
+  """Publisher for book items."""
+  publisher: String
+  """Publication date for book items."""
+  publishedDate: Date
+  """Industry identifiers for book items (e.g., ISBN)."""
+  industryIdentifiers: [BookIndustryIdentifier] @deprecated
+  """Number of pages for book items."""
+  pageCount: Int
+  """Categories the item belongs to."""
+  categories: [String!]
+  """Maturity rating for book items."""
+  maturityRating: String
+  """Language of the item."""
+  language: String
+  """Format description for book items."""
+  format: String
+}
+
+"""
+Represents an inventory item (release, book, or product) with listings and metadata.
+"""
+type Item @doc(category: "Items") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the item."""
+  id: Float!
+  """Date when the item was created."""
+  created: Date
+  """Whether the item is in the user's wantlist."""
+  wanted: Boolean
+  """URL path to the item page."""
+  path: String!
+  """SEO metadata for the item."""
+  seo: SeoEntry
+  """URI identifier for the item."""
+  uri: String!
+  """Item type (e.g., "release", "book", "product")."""
+  type: String!
+  """Whether the item is forbidden for sale."""
+  isForbiddenForSale: Boolean
+  """Detailed item data and metadata."""
+  data: ItemData!
+  """URL-friendly handle for the item."""
+  handle: String @deprecated
+  """Shortened URL via Bitly."""
+  bitly: String
+  """Item descriptions in multiple formats."""
+  descriptions: Descriptions!
+  """Available listings for this item."""
+  listings: [Listing!]!
+}
+
+"""A single item entry within a playlist with optional comments."""
+type PlaylistEntry @doc(category: "Playlists") {
+  """The item in the playlist."""
+  item: Item!
+  """Optional comments about this item in the playlist."""
+  comments: String
+}
+
+"""Represents a curated playlist of items."""
+type Playlist @doc(category: "Playlists") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the playlist."""
+  id: Int!
+  """Title of the playlist."""
+  title: String
+  """URL link to the playlist."""
+  link: String
+  """Items in the playlist (deprecated, use entries instead)."""
+  items: [Item]
+  """Playlist entries with items and comments."""
+  entries: [PlaylistEntry!]!
+}
+
+"""A single content block within an article's structured content."""
+type ArticleContentBlock @doc(category: "Articles") {
+  """Unique identifier for the block."""
+  id: ID
+  """Type of content block."""
+  type: String
+  """Block-specific data in JSON format."""
+  data: JSON
+}
+
+"""A column containing multiple content blocks."""
+type ArticleContentColumn @doc(category: "Articles") {
+  """Unique identifier for the column."""
+  id: ID
+  """Content blocks within this column."""
+  blocks: [ArticleContentBlock!]!
+}
+
+"""Display options for an article content row."""
+type ArticleContentRowOptions @doc(category: "Articles") {
+  """Whether the row spans the full width."""
+  fullWidth: Boolean
+  """Whether to display content as a carousel."""
+  carousel: Boolean
+  """Background color for the row."""
+  backgroundColor: String
+  """Whether to remove padding from the row."""
+  noPadding: Boolean
+}
+
+"""A row containing multiple columns of content blocks."""
+type ArticleContentRow @doc(category: "Articles") {
+  """Unique identifier for the row."""
+  id: ID
+  """Display options for this row."""
+  options: ArticleContentRowOptions
+  """Layout identifier for the row."""
+  layout: String
+  """Columns within this row."""
+  columns: [ArticleContentColumn!]!
+}
+
+"""
+Article content in multiple formats: plain text, HTML, structured editor, or rows.
+"""
+type ArticleContent @doc(category: "Articles") {
+  """Plain text content."""
+  text: String
+  """HTML-formatted content."""
+  html: String
+  """Structured editor content in JSON format."""
+  editor: JSON
+  """Structured content organized in rows and columns."""
+  rows: [ArticleContentRow!]!
+}
+
+"""Publication status and date for an article."""
+type ArticlePublished @doc(category: "Articles") {
+  """Whether the article is published."""
+  status: Boolean
+  """Publication date."""
+  date: Date
+}
+
+"""Type of article content format."""
+enum ArticleType @doc(category: "Articles") {
+  """Blog post article."""
+  post
+  """Editor-structured article."""
+  editor
+  """HTML-formatted article."""
+  html
+  """Plain text article."""
+  text
+  """Static page article."""
+  page
+}
+
+"""Represents a blog post, page, or article with content and metadata."""
+type Article @doc(category: "Articles") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the article."""
+  id: Int!
+  """Creation date of the article."""
+  created: Date @deprecated
+  """Last modification date of the article."""
+  modified: Date @deprecated
+  """Publication status and date."""
+  published: ArticlePublished
+  """URL path to the article."""
+  url: String
+  """SEO metadata for the article."""
+  seo: SeoEntry
+  """Whether the article is private and requires authentication."""
+  private: Boolean
+  """Article content in various formats."""
+  content: ArticleContent!
+  """Whether this article is set as the homepage."""
+  homepage: Boolean
+  """Thumbnail image for the article."""
+  thumbnail: Media
+  """Title of the article."""
+  title: String!
+  """Type of article content format."""
+  type: ArticleType
+  """Tags associated with the article."""
+  tags: [String!]!
+  """URL-friendly handle for the article."""
+  handle: String!
+}
+
+"""Image associated with an artist."""
+type ArtistImage @doc(category: "Artists") {
+  """URI to the full-size image."""
+  uri: String
+  """URI to the thumbnail image."""
+  thumbnail: String
+}
+
+"""Country information for an artist."""
+type ArtistCountry @doc(category: "Artists") {
+  """Two-letter ISO country code."""
+  alpha2: String
+  """Country name."""
+  name: String
+}
+
+"""Member of an artist group or band."""
+type ArtistMember @doc(category: "Artists") {
+  """External identifier for the member."""
+  id: Float
+  """Name of the member."""
+  name: String
+}
+
+"""Represents an artist with profile information, images, and metadata."""
+type Artist @doc(category: "Artists") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the artist."""
+  id: Float
+  """External identifier from the marketplace system."""
+  discogsId: Int
+  """Date when the artist record was created."""
+  createdAt: Date
+  """Date when the artist record was last modified."""
+  modifiedAt: Date
+  """Biography or profile text for the artist."""
+  profile: String
+  """Artist name."""
+  name: String!
+  """Artist name variations (ANVs)."""
+  anvs: [String!]
+  """Official websites for the artist."""
+  websites: [String!]
+  """Images associated with the artist."""
+  images: [ArtistImage!]
+  """Country of origin for the artist."""
+  country: ArtistCountry
+  """Tags associated with the artist."""
+  tags: [String!]
+  """Members of the artist group or band."""
+  members: [ArtistMember!]
+}
+
+"""Image associated with a label."""
+type LabelImage @doc(category: "Labels") {
+  """URI to the full-size image."""
+  uri: String
+  """URI to the thumbnail image."""
+  thumbnail: String
+}
+
+"""Country information for a label."""
+type LabelCountry @doc(category: "Labels") {
+  """Two-letter ISO country code."""
+  alpha2: String
+  """Country name."""
+  name: String
+}
+
+"""Sub-label or imprint associated with a parent label."""
+type LabelSub @doc(category: "Labels") {
+  """External identifier for the sub-label."""
+  id: Float
+  """Name of the sub-label."""
+  name: String
+}
+
+"""
+Represents a record label with profile information, images, and metadata.
+"""
+type Label @doc(category: "Labels") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the label."""
+  id: Float!
+  """External identifier from the marketplace system."""
+  discogsId: Int
+  """Date when the label record was created."""
+  createdAt: Date
+  """Date when the label record was last modified."""
+  modifiedAt: Date
+  """Biography or profile text for the label."""
+  profile: String
+  """Label name."""
+  name: String!
+  """Official websites for the label."""
+  websites: [String!]
+  """Images associated with the label."""
+  images: [LabelImage!]
+  """Country of origin for the label."""
+  country: LabelCountry
+  """Tags associated with the label."""
+  tags: [String!]
+  """Sub-labels or imprints associated with this label."""
+  subLabels: [LabelSub!]
+}
+
+"""Site configuration for a multi-site setup."""
+type ConfigSite @doc(category: "Config") {
+  """Whether this is the primary site."""
+  isPrimary: Boolean
+  """Domain name for this site."""
+  domain: String
+}
+
+"""Configuration module with custom data."""
+type ConfigModule @doc(category: "Config") {
+  """Module identifier."""
+  id: String
+  """Module-specific configuration data in JSON format."""
+  data: JSON
+}
+
+"""API key configuration for external integrations."""
+type ConfigApiKey @doc(category: "Config") {
+  """API key value."""
+  value: String
+  """Name of the API key."""
+  name: String
+  """Whether the API key is enabled."""
+  enabled: Boolean
+  """Description of the API key's purpose."""
+  description: String
+}
+
+"""Cash in advance payment method configuration."""
+type EshopCheckoutPaymentMethodsCashInAdvance @doc(category: "Config") {
+  """Whether cash in advance is enabled."""
+  status: Boolean
+  """Notes or instructions for cash in advance payments."""
+  notes: String
+}
+
+"""Iyzipay payment method configuration."""
+type EshopCheckoutPaymentIyzipay @doc(category: "Config") {
+  """Whether Iyzipay is enabled."""
+  enabled: Boolean
+}
+
+"""Payze payment method configuration."""
+type EshopCheckoutPaymentPayze @doc(category: "Config") {
+  """Whether Payze is enabled."""
+  enabled: Boolean
+}
+
+"""Flitt payment method configuration."""
+type EshopCheckoutPaymentFlitt @doc(category: "Config") {
+  """Whether Flitt is enabled."""
+  enabled: Boolean
+}
+
+"""Stripe payment method configuration."""
+type EshopCheckoutPaymentStripe @doc(category: "Config") {
+  """Whether Stripe is enabled."""
+  enabled: Boolean
+  """Stripe publishable API key."""
+  publishableKey: String
+}
+
+"""Available payment methods for checkout."""
+type EshopCheckoutPaymentMethods @doc(category: "Config") {
+  """Cash in advance payment method."""
+  cashInAdvance: EshopCheckoutPaymentMethodsCashInAdvance
+  """Iyzipay payment method."""
+  iyzipay: EshopCheckoutPaymentIyzipay
+  """Payze payment method."""
+  payze: EshopCheckoutPaymentPayze @deprecated
+  """Stripe payment method."""
+  stripe: EshopCheckoutPaymentStripe
+  """Flitt payment method."""
+  flitt: EshopCheckoutPaymentFlitt
+}
+
+"""Checkout configuration settings."""
+type EshopCheckout @doc(category: "Config") {
+  """Checkout version number."""
+  version: Int
+  """Available payment methods."""
+  paymentMethods: EshopCheckoutPaymentMethods
+}
+
+"""Language preferences configuration."""
+type ConfigEshopPreferencesLanguages @doc(category: "Config") {
+  """Whitelist of allowed language codes."""
+  whitelist: [String!]
+}
+
+"""Homepage configuration."""
+type ConfigEshopPreferencesHomepage @doc(category: "Config") {
+  """Type of homepage (e.g., "article", "collection")."""
+  type: String!
+  """Handle or identifier for the homepage content."""
+  handle: String!
+  """Reference identifier for the homepage content."""
+  ref: ID
+}
+
+"""Audio player preferences."""
+type ConfigEshopPreferencesPlayer @doc(category: "Config") {
+  """Whether the audio player is enabled."""
+  enabled: Boolean
+}
+
+"""Wantlist feature preferences."""
+type ConfigEshopPreferencesWantlist @doc(category: "Config") {
+  """Whether the wantlist feature is enabled."""
+  enabled: Boolean
+}
+
+"""Item suggestions preferences."""
+type ConfigEshopPreferencesSuggestions @doc(category: "Config") {
+  """Whether item suggestions are enabled."""
+  enabled: Boolean
+}
+
+"""Private access configuration."""
+type ConfigEshopPreferencesAccessPrivate @doc(category: "Config") {
+  """Whether private access is enabled."""
+  enabled: Boolean
+  """Message to display when access is restricted."""
+  message: String
+}
+
+"""Maintenance mode configuration."""
+type ConfigEshopPreferencesAccessMaintenance @doc(category: "Config") {
+  """Whether maintenance mode is enabled."""
+  enabled: Boolean
+  """Message to display during maintenance."""
+  message: String
+}
+
+"""Access control preferences."""
+type ConfigEshopPreferencesAccess @doc(category: "Config") {
+  """Private access configuration."""
+  private: ConfigEshopPreferencesAccessPrivate!
+  """Maintenance mode configuration."""
+  maintenance: ConfigEshopPreferencesAccessMaintenance!
+}
+
+"""E-shop preferences and feature settings."""
+type ConfigEshopPreferences @doc(category: "Config") {
+  """Access control preferences."""
+  access: ConfigEshopPreferencesAccess!
+  """Language preferences."""
+  languages: ConfigEshopPreferencesLanguages
+  """Homepage configuration."""
+  homepage: ConfigEshopPreferencesHomepage
+  """Audio player preferences."""
+  player: ConfigEshopPreferencesPlayer
+  """Wantlist feature preferences."""
+  wantlist: ConfigEshopPreferencesWantlist
+  """Item suggestions preferences."""
+  suggestions: ConfigEshopPreferencesSuggestions
+}
+
+"""Head section configuration for HTML output."""
+type ConfigEshopHead @doc(category: "Config") {
+  """Additional HTML tags to include in the head section."""
+  tags: [String]
+}
+
+"""SEO configuration for the e-shop."""
+type ConfigEshopSeo @doc(category: "Config") {
+  """SEO title for the shop."""
+  title: String
+  """Meta description for search engines."""
+  description: String
+  """URL to the favicon image."""
+  favicon: String
+  """URL to the default social sharing image."""
+  image: String
+  """Robots meta tag content."""
+  robots: String
+  """Whether search engines should index the shop."""
+  index: Boolean
+  """Whether search engines should index the catalog."""
+  indexCatalogue: Boolean
+}
+
+"""E-shop configuration including theme, checkout, and preferences."""
+type Eshop @doc(category: "Config") {
+  """Base URI for the e-shop."""
+  uri: String
+  """Navigation menus in JSON format."""
+  menus: [JSON!]!
+  """Checkout configuration."""
+  checkout: EshopCheckout!
+  """Head section configuration."""
+  head: ConfigEshopHead
+  """E-shop preferences and feature settings."""
+  preferences: ConfigEshopPreferences!
+  """SEO configuration."""
+  seo: ConfigEshopSeo
+}
+
+"""Google Analytics view configuration."""
+type GoogleAnalyticsView @doc(category: "Config") {
+  """Name of the Analytics view."""
+  name: String
+  """Analytics view identifier."""
+  id: String
+}
+
+"""Google Analytics property configuration."""
+type GoogleAnatyticsProperty @doc(category: "Config") {
+  """Analytics property identifier."""
+  id: String
+  """Name of the Analytics property."""
+  name: String
+  """Tracker identifier."""
+  tracker: String
+}
+
+"""Google Analytics configuration."""
+type GoogleAnalytics @doc(category: "Config") {
+  """Analytics view configuration."""
+  view: GoogleAnalyticsView
+  """Analytics property configuration."""
+  property: GoogleAnatyticsProperty
+}
+
+"""Google Tag Manager configuration."""
+type GoogleGtm @doc(category: "Config") {
+  """Google Tag Manager container identifier."""
+  id: String
+}
+
+"""Google integration configuration."""
+type Google @doc(category: "Config") {
+  """Google Analytics configuration."""
+  analytics: GoogleAnalytics
+  """Google Tag Manager configuration."""
+  gtm: GoogleGtm
+}
+
+"""Tax calculation rules."""
+type ConfigTaxesRules @doc(category: "Config") {
+  """Whether prices can be edited before taxes are applied."""
+  editPricesBeforeTaxes: Boolean
+  """Whether to show prices before taxes are applied."""
+  showPricesBeforeTaxes: Boolean
+}
+
+"""Tax configuration."""
+type ConfigTaxes @doc(category: "Config") {
+  """Tax calculation rules."""
+  rules: ConfigTaxesRules!
+}
+
+"""Social media link configuration."""
+type ConfigSocial @doc(category: "Config") {
+  """Social media platform identifier."""
+  id: String!
+  """Social media URL or value."""
+  value: String
+  """Display title for the social link."""
+  title: String
+}
+
+"""Link to an article for navigation or display."""
+type ArticleLink @doc(category: "Config") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the article."""
+  id: Int!
+  """URL-friendly handle for the article."""
+  handle: String!
+  """Article type (deprecated)."""
+  type: String @deprecated
+  """Article title (deprecated)."""
+  title: String @deprecated
+}
+
+"""Meta (Facebook) integration configuration."""
+type Meta @doc(category: "Config") {
+  """Meta Pixel configuration."""
+  pixel: MetaPixel
+}
+
+"""Meta Pixel tracking configuration."""
+type MetaPixel @doc(category: "Config") {
+  """Meta Pixel identifier."""
+  id: String
+  """Whether the Meta Pixel is enabled."""
+  enabled: Boolean
+}
+
+"""
+Represents the complete shop configuration including e-shop settings, payment methods, and integrations.
+"""
+type Config @doc(category: "Config") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the configuration."""
+  id: Int!
+  """Base URI for the shop."""
+  uri: String
+  """Name of the shop."""
+  shopName: String!
+  """Currency code (e.g., "EUR", "USD")."""
+  currency: String!
+  """Currency symbol (e.g., "€", "$")."""
+  currencySymbol: String
+  """
+  Position of the currency symbol relative to the amount (e.g., "before", "after").
+  """
+  currencySymbolPosition: String
+  """Configured sites for multi-site setups."""
+  sites: [ConfigSite!]!
+  """Configuration modules with custom data."""
+  modules: [ConfigModule!]!
+  """Available articles for navigation or display."""
+  articles: [ArticleLink!]!
+  """Primary domain name for the shop."""
+  domain: String
+  """API key configuration (deprecated)."""
+  apiKey: ConfigApiKey @deprecated
+  """E-shop configuration including theme, checkout, and preferences."""
+  eshop: Eshop!
+  """Meta (Facebook) integration configuration."""
+  meta: Meta
+  """Product categories (deprecated)."""
+  categories: [String] @deprecated
+  """Product categories (deprecated)."""
+  categoriesProduct: [String] @deprecated
+  """Product types (deprecated)."""
+  productTypes: [String] @deprecated
+  """Google integration configuration."""
+  google: Google
+  """Tax configuration."""
+  taxes: ConfigTaxes!
+  """Social media links."""
+  socials: [ConfigSocial!]
+}
+
+"""Paginated inventory results with items and filter metadata."""
+type Inventory @doc(category: "Items") {
+  """Pagination metadata for the results."""
+  pagination: Pagination!
+  """List of items in the current page."""
+  items: [Item!]!
+  """Applied filter values in JSON format."""
+  filters: JSON
+}
+
+"""Paginated inventory items with pagination metadata."""
+type InventoryItems @doc(category: "Items") {
+  """List of items in the current page."""
+  items: [Item!]!
+  """Pagination metadata for the results."""
+  pagination: Pagination!
+}
+
+"""A single filter option result with match count."""
+type FilterResult @doc(category: "Items") {
+  """Unique identifier for the filter option."""
+  _id: String!
+  """Number of items matching this filter option."""
+  matches: Float!
+  """Numeric identifier for the filter option."""
+  id: Float
+  """Whether this filter option is currently selected."""
+  selected: Boolean
+}
+
+"""A filter group with its options and metadata."""
+type InventoryFiltersPaginationFilter @doc(category: "Items") {
+  """Unique identifier for the filter."""
+  id: String!
+  """Filter key name."""
+  key: String!
+  """Type of filter (e.g., "range", "select", "multiselect")."""
+  type: String!
+  """Layout type for displaying the filter."""
+  layout: String!
+  """Available filter options with match counts."""
+  options: [FilterResult!]!
+}
+
+"""Paginated filter options for inventory filtering."""
+type InventoryFiltersPagination @doc(category: "Items") {
+  """List of filter groups with their options."""
+  filters: [InventoryFiltersPaginationFilter!]!
+  """Total number of pages for filter options."""
+  pages: Int!
+}
+
+"""Input filters for querying inventory items."""
+input InventoryFiltersInput @doc(category: "Items") {
+  """Lower bound for price range filter."""
+  from: String
+  """Upper bound for price range filter."""
+  to: String
+  """Filter for pre-order items only."""
+  preorder: Boolean
+  """Filter for pre-order status (e.g., "all", "available")."""
+  preorders: String
+  """Filter by item type."""
+  type: String
+  """Filter by multiple item types."""
+  itemTypes: [String!]
+  """Filter by manufacturer names."""
+  manufacturers: [String!]
+  """Filter by format types."""
+  types: [String!]
+  """Maximum price filter."""
+  maxPrice: Int
+  """Filter by country codes."""
+  countries: [String!]
+  """Filter by release years."""
+  years: [Int!]
+  """Filter by artist identifiers."""
+  artists: [Float!]
+  """Filter by label identifiers."""
+  labels: [Float!]
+  """Filter by format names."""
+  formats: [String!]
+  """Filter by format descriptions."""
+  formatDescriptions: [String!]
+  """Filter by medium types."""
+  mediums: [String!] @deprecated
+  """Filter by category names."""
+  categories: [String!]
+  """Filter by stock status (e.g., "inStock", "outOfStock")."""
+  stock: String
+  """Filter by item condition."""
+  condition: String
+  """Filter by musical styles."""
+  styles: [String!]
+  """Filter by musical genres."""
+  genres: [String!]
+  """Filter for items in the user's wantlist."""
+  wantlist: Boolean
+  """Filter for items with a compare-at price set."""
+  compareAtPrice: Boolean
+  """Return all items without applying any filters."""
+  noFilters: Boolean
+}
+
+"""Banner image for a collection."""
+type CollectionBanner @doc(category: "Collections") {
+  """Media file for the banner."""
+  media: Media
+  """Format identifier for the banner."""
+  format: String
+}
+
+"""Description content for a collection."""
+type CollectionDescription @doc(category: "Collections") {
+  """Description text content."""
+  content: String
+}
+
+"""Sort configuration for a collection."""
+type CollectionSort @doc(category: "Collections") {
+  """Field name to sort by."""
+  key: String
+  """Sort order (1 for ascending, -1 for descending)."""
+  order: Int
+}
+
+"""
+Represents a curated collection of items with filtering and display settings.
+"""
+type Collection @doc(category: "Collections") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the collection."""
+  id: Int!
+  """Title of the collection."""
+  title: String!
+  """URL-friendly handle for the collection."""
+  handle: String!
+  """View type for displaying the collection."""
+  viewType: String
+  """URL path to the collection page."""
+  path: String
+  """Default sort configuration for the collection."""
+  sort: CollectionSort
+  """Banner image for the collection."""
+  banner: CollectionBanner
+  """SEO metadata for the collection."""
+  seo: SeoEntry
+  """Description of the collection."""
+  description: CollectionDescription
+}
+
+"""A paginated page of items from a collection."""
+type CollectionPage @doc(category: "Collections") {
+  """Pagination metadata for the results."""
+  pagination: Pagination!
+  """Items in the current page."""
+  items: [Item!]!
+}
+
+"""A collection with its first page of items."""
+type CollectionWithData @doc(category: "Collections") {
+  """The collection information."""
+  collection: Collection!
+  """First page of items in the collection."""
+  page: CollectionPage!
+}
+
+"""A collection with paginated items."""
+type CollectionItems @doc(category: "Collections") {
+  """The collection information."""
+  collection: Collection!
+  """Items in the current page."""
+  items: [Item!]!
+  """Pagination metadata for the results."""
+  pagination: Pagination!
+}
+
+"""Input fields for specifying a physical address."""
+input AddressInput @doc(category: "Users") {
+  """Internal database identifier for an existing address."""
+  _id: ID
+  """Optional description or label for the address."""
+  description: String
+  """First name of the address recipient."""
+  firstName: String
+  """Last name of the address recipient."""
+  lastName: String
+  """Primary street address line."""
+  addressLine1: String
+  """Secondary street address line."""
+  addressLine2: String
+  """Street number component."""
+  streetNumber: String
+  """City or locality name."""
+  city: String
+  """State or province name."""
+  state: String
+  """State or province code abbreviation."""
+  stateCode: String
+  """Postal or ZIP code."""
+  postCode: String
+  """Full country name."""
+  country: String
+  """Two-letter ISO 3166-1 alpha-2 country code."""
+  alpha2: String
+  """Type of address (e.g., "billing", "shipping")."""
+  type: String
+}
+
+"""Represents a physical address."""
+type Address @doc(category: "Users") {
+  """Internal database identifier."""
+  _id: ID
+  """Optional description or label for the address."""
+  description: String
+  """First name of the address recipient."""
+  firstName: String
+  """Last name of the address recipient."""
+  lastName: String
+  """Primary street address line."""
+  addressLine1: String
+  """Secondary street address line."""
+  addressLine2: String
+  """Street number component."""
+  streetNumber: String
+  """City or locality name."""
+  city: String
+  """State or province name."""
+  state: String
+  """State or province code abbreviation."""
+  stateCode: String
+  """Postal or ZIP code."""
+  postCode: String
+  """Full country name."""
+  country: String
+  """Two-letter ISO 3166-1 alpha-2 country code."""
+  alpha2: String
+  """Type of address (e.g., "billing", "shipping")."""
+  type: String
+}
+
+"""Back-in-stock notification preferences."""
+type UserPreferencesNotificationsBackInStock @doc(category: "Users") {
+  """Whether email notifications are enabled for back-in-stock items."""
+  email: Boolean
+}
+
+"""User notification preferences."""
+type UserPreferencesNotifications @doc(category: "Users") {
+  """Back-in-stock notification settings."""
+  backInStock: UserPreferencesNotificationsBackInStock
+}
+
+"""User account preferences and settings."""
+type UserPreferences @doc(category: "Users") {
+  """Notification preferences."""
+  notifications: UserPreferencesNotifications
+  """Preferred language for the user interface."""
+  preferredLanguage: String
+}
+
+"""Represents a user account with personal information and preferences."""
+type User @doc(category: "Users") {
+  """Internal database identifier."""
+  _id: ID!
+  """Numeric identifier for the user."""
+  id: Float @deprecated
+  """User's first name."""
+  firstName: String
+  """User's last name."""
+  lastName: String
+  """Full name of the user."""
+  name: String
+  """Email address for the user account."""
+  email: String
+  """Telephone number."""
+  telephone: String
+  """Tax identification number."""
+  taxNumber: String
+  """Organization or company name."""
+  organisation: String
+  """Saved addresses for the user."""
+  addresses: [Address!]
+  """Whether the user is subscribed to marketing communications."""
+  isSubscribed: Boolean
+  """User account preferences and settings."""
+  preferences: UserPreferences
+}
+
+"""Represents an analytics or tracking event."""
+type Event @doc(category: "Common") {
+  """Unique identifier for the event."""
+  id: ID
+  """Reference identifier for the related resource."""
+  ref: ID
+  """Type of event."""
+  type: String
+  """Date when the event was created."""
+  createdAt: Date
+}
+
+"""Represents an authenticated user session."""
+type Session @doc(category: "Sessions") {
+  """Internal database identifier."""
+  _id: ID!
+  """JSON Web Token for authentication."""
+  jwt: String!
+  """Session expiration date."""
+  expires: Date
+  """User associated with this session."""
+  user: User!
+}
+
+"""Response from a login operation."""
+type LoginResponse @doc(category: "Sessions") {
+  """Created session for the authenticated user."""
+  session: Session
+  """Total number of active sessions for the user."""
+  sessionsCount: Int
+  """Associated checkout if one exists."""
+  checkout: Checkout
+}
+
+"""Response from a logout operation."""
+type LogoutResponse @doc(category: "Sessions") {
+  """Whether the logout was successful."""
+  ok: Boolean
+  """Associated checkout if one exists."""
+  checkout: Checkout
+}
+
+"""Response from a user registration operation."""
+type RegisterResponse @doc(category: "Sessions") {
+  """Created user account."""
+  user: User!
+  """Created session for the new user."""
+  session: Session
+  """Optional message about the registration."""
+  message: String
+}
+
+"""Sender information for an order message."""
+type OrderMessageSender @doc(category: "Orders") {
+  """Name of the message sender."""
+  name: String
+  """Alias or display name of the sender."""
+  alias: String
+}
+
+"""Attachment associated with an order message."""
+type OrderMessageAttachment @doc(category: "Orders") {
+  """Internal database identifier."""
+  _id: ID
+  """URI to the attachment file."""
+  uri: String
+  """Title of the attachment."""
+  title: String
+}
+
+"""A message in an order conversation thread."""
+type Message @doc(category: "Orders") {
+  """Message content text."""
+  content: String
+  """Message subject line."""
+  subject: String
+  """Date when the message was created."""
+  created: Date
+  """Whether the message was sent by the buyer."""
+  fromBuyer: Boolean
+  """Sender information."""
+  sender: OrderMessageSender
+  """Attachments included with the message."""
+  attachments: [OrderMessageAttachment!]
+}
+
+"""
+Represents a customer order with items, billing, shipping, and payment information.
+"""
+type Order @doc(category: "Orders") {
+  """Internal database identifier."""
+  _id: ID!
+  """Order identifier string."""
+  id: String!
+  """Configuration reference for the shop."""
+  configRef: ID
+  """Date when the order was created."""
+  created: Date
+  """Origin of the order (e.g., "Online")."""
+  origin: String!
+  """Current status of the order."""
+  status: String!
+  """Order totals including subtotals, taxes, and shipping."""
+  totals: CheckoutTotals!
+  """Buyer information."""
+  buyer: User
+  """Billing information and payment details."""
+  billing: CheckoutBilling!
+  """Shipping information and method."""
+  shipping: CheckoutShipping!
+  """Items included in the order."""
+  items: [CheckoutLineItem!]!
+  """Messages in the order conversation thread."""
+  messages: [Message!]
+  """URL for payment processing if payment is pending."""
+  paymentUrl: String
+}
+
+"""Results from a search query."""
+type SearchResponse @doc(category: "Items") {
+  """Items matching the search query."""
+  items: [Item!]!
+}
+
+"""User information associated with a checkout."""
+type CheckoutUser @doc(category: "Checkout") {
+  """Internal database identifier."""
+  _id: String
+  """User identifier string."""
+  id: String
+  """User's first name."""
+  firstName: String
+  """User's last name."""
+  lastName: String
+  """Full name of the user."""
+  name: String
+  """Email address."""
+  email: String
+  """Telephone number."""
+  telephone: String
+  """Tax identification number."""
+  taxNumber: String
+}
+
+"""Email notification information."""
+type CheckoutEmail @doc(category: "Checkout") {
+  """Email recipient address."""
+  recipient: String
+  """Date when the email was sent."""
+  date: Date
+}
+
+"""Tax information applied to a checkout item or shipping."""
+type CheckoutTax @doc(category: "Checkout") {
+  """Name of the tax (e.g., "VAT", "Sales Tax")."""
+  name: String
+  """Tax amount in the shop's currency."""
+  amount: Float
+  """Tax rate as a percentage."""
+  rate: Float
+}
+
+"""Pricing information for a listing in a checkout."""
+type CheckoutListingPrice @doc(category: "Checkout") {
+  """Price before taxes are applied."""
+  beforeTaxes: Float
+  """Base price of the listing."""
+  base: Float
+  """Current sale price as a string."""
+  sale: String
+  """Original compare price as a string."""
+  compare: String
+  """Cost price as a string."""
+  cost: String
+}
+
+"""Pricing information for a checkout line item including taxes."""
+type CheckoutLinePrice @doc(category: "Checkout") {
+  """Taxes applied to this line item."""
+  taxes: [CheckoutTax!]
+  """Price before taxes are applied."""
+  beforeTaxes: Float!
+  """Base price of the line item."""
+  base: Float!
+  """Subtotal for this line item including taxes."""
+  subtotal: Float!
+  """Subtotal for this line item before taxes."""
+  subtotalBeforeTaxes: Float!
+}
+
+"""Shipping price information including taxes."""
+type CheckoutShippingPrice @doc(category: "Checkout") {
+  """Taxes applied to shipping."""
+  taxes: [CheckoutTax!]
+  """Shipping price before taxes are applied."""
+  beforeTaxes: Float!
+  """Base shipping price."""
+  base: Float!
+  """Shipping subtotal including taxes."""
+  subtotal: Float
+  """Shipping subtotal before taxes."""
+  subtotalBeforeTaxes: Float
+}
+
+"""Available shipping method with total cost."""
+type CheckoutMethod @doc(category: "Checkout") {
+  """Name of the shipping method."""
+  name: String!
+  """Total cost for this shipping method."""
+  total: Float!
+}
+
+"""Shipping information for a checkout."""
+type CheckoutShipping @doc(category: "Checkout") {
+  """Shipping status (e.g., "pending", "shipped")."""
+  status: String
+  """Expected or actual shipping date."""
+  date: Date
+  """Shipping price information including taxes."""
+  price: CheckoutShippingPrice!
+  """Selected shipping method identifier."""
+  method: String
+  """Available shipping methods with costs."""
+  methods: [CheckoutMethod!]
+  """Minimum order amount to qualify for free shipping."""
+  freeShippingThreshold: Float
+  """Shipping address."""
+  address: Address
+  """Tracking number for shipped orders."""
+  tracking: String
+  """Whether this is a shop collection order (pickup in store)."""
+  shopCollection: Boolean
+  """Shipping confirmation email information."""
+  confirmationEmail: CheckoutEmail
+  """Total weight of items for shipping calculation."""
+  weight: String
+}
+
+"""Payment method information for a checkout."""
+type CheckoutPaymentMethod @doc(category: "Checkout") {
+  """Amount paid or refunded via this payment method."""
+  amount: Float!
+  """Origin of the payment (e.g., "stripe", "paypal")."""
+  origin: String
+  """Display label for the payment method."""
+  label: String
+  """Date when the payment method was added."""
+  added: Date
+}
+
+"""Invoice information for a checkout."""
+type CheckoutInvoice @doc(category: "Checkout") {
+  """Invoice date."""
+  date: Date
+  """URL to the invoice PDF file."""
+  pdf: String
+  """Invoice identifier string."""
+  id: String
+  """Email notifications sent for this invoice."""
+  emails: [CheckoutEmail!]
+}
+
+"""Voucher information applied to a checkout."""
+type CheckoutVoucher @doc(category: "Checkout") {
+  """Voucher identifier string."""
+  id: String
+  """Current value of the voucher after redemption."""
+  value: String
+  """Original value of the voucher before redemption."""
+  originalValue: String
+  """Type of voucher redemption (e.g., "percentage", "fixed")."""
+  redeemType: String
+  """Whether the voucher has been redeemed."""
+  redeemed: Boolean
+  """Expiration date of the voucher."""
+  expires: Date
+  """Whether the voucher has unlimited uses."""
+  unlimited: Boolean
+  """User who owns or used the voucher."""
+  user: CheckoutUser
+  """Date when the voucher was created."""
+  created: Date
+  """Note associated with the voucher."""
+  note: CheckoutNote
+}
+
+"""Billing and payment information for a checkout."""
+type CheckoutBilling @doc(category: "Checkout") {
+  """Billing status (e.g., "pending", "paid", "refunded")."""
+  status: String
+  """Date when payment was received."""
+  paymentDate: Date
+  """Date when refund was issued."""
+  refundDate: Date
+  """Billing address."""
+  address: Address
+  """Payment methods used for this checkout."""
+  paymentMethods: [CheckoutPaymentMethod!]
+  """Refunds issued for this checkout."""
+  refunds: [CheckoutPaymentMethod!]
+  """Voucher applied to this checkout."""
+  voucher: CheckoutVoucher
+  """Invoice information for this checkout."""
+  invoice: CheckoutInvoice
+}
+
+"""Spending record for a voucher (tracks order usage)."""
+type CheckoutSpending @doc(category: "Checkout") {
+  """Order identifier where the voucher was used."""
+  orderId: String
+  """Amount spent using the voucher."""
+  amount: String
+}
+
+"""Note or comment associated with a checkout."""
+type CheckoutNote @doc(category: "Checkout") {
+  """Date when the note was created."""
+  date: Date
+  """Content of the note."""
+  content: String
+  """User who created the note."""
+  user: CheckoutUser
+}
+
+"""Buyer information for a checkout."""
+type CheckoutBuyer @doc(category: "Checkout") {
+  """Internal database identifier."""
+  _id: String
+  """Email address of the buyer."""
+  email: String
+  """Buyer's first name."""
+  firstName: String
+  """Numeric identifier for the buyer."""
+  id: Float
+  """Buyer's last name."""
+  lastName: String
+  """Full name of the buyer."""
+  name: String
+  """Telephone number."""
+  telephone: String
+  """Organization or company name."""
+  organisation: String
+  """Tax identification number."""
+  taxNumber: String
+  """Whether the buyer is a guest (not registered)."""
+  isGuest: Boolean
+}
+
+"""Stock quantity information for a checkout listing."""
+type CheckoutStock @doc(category: "Checkout") {
+  """
+  Available quantity in stock. Null means stock is not tracked (always available).
+  """
+  quantity: Float
+}
+
+"""Product option for a checkout listing."""
+type CheckoutListingOption @doc(category: "Checkout") {
+  """Name of the option (e.g., "Size", "Color")."""
+  name: String
+  """Value of the option (e.g., "Large", "Red")."""
+  value: String
+  """Option identifier."""
+  id: String
+}
+
+"""Listing information for an item in a checkout."""
+type CheckoutListing @doc(category: "Checkout") {
+  """Internal database identifier."""
+  _id: String!
+  """Numeric identifier for the listing."""
+  id: Float!
+  """Pricing information for this listing."""
+  prices: CheckoutListingPrice!
+  """Public comments about the listing."""
+  comments: String
+  """Private comments visible only to shop administrators."""
+  privateComments: String
+  """Physical location of the item."""
+  location: String
+  """External identifier from the marketplace system."""
+  discogsId: String
+  """Tax definition identifier for this listing."""
+  taxDefinition: String
+  """Whether to prevent listing on the marketplace system."""
+  preventDiscogsListing: Boolean
+  """Whether only one item per customer is allowed."""
+  onePerCustomer: Boolean
+  """Stock quantity information."""
+  stock: CheckoutStock!
+  """Supplier code for this listing."""
+  supplierCode: String
+  """Date when the listing was posted."""
+  posted: Date
+  """Date when the item becomes available for purchase."""
+  available: Date
+  """Categories this listing belongs to."""
+  categories: [String]
+  """Whether this is a pre-order listing."""
+  preOrder: Boolean
+  """Product option variants for this listing."""
+  options: [CheckoutListingOption!]!
+}
+
+"""Item information for a checkout line item."""
+type CheckoutItem @doc(category: "Checkout") {
+  """Numeric identifier for the item."""
+  id: Float
+  """Description of the item."""
+  description: String!
+  """URL to the item thumbnail image."""
+  thumbnail: String
+  """Weight of the item."""
+  weight: String
+  """URL path to the item page."""
+  path: String
+}
+
+"""A single line item in a checkout with quantity and pricing."""
+type CheckoutLineItem @doc(category: "Checkout") {
+  """Internal database identifier."""
+  _id: ID!
+  """Line item identifier."""
+  id: ID @deprecated
+  """Listing information for this line item."""
+  listing: CheckoutListing!
+  """Item information for this line item."""
+  item: CheckoutItem!
+  """Quantity of items in this line."""
+  quantity: Float!
+  """Pricing information for this line item."""
+  price: CheckoutLinePrice!
+  """Date when this item was added to the checkout."""
+  added: Date
+  """Total price for this line item."""
+  total: Float
+  """Whether this item is currently unavailable."""
+  unavailable: Boolean
+}
+
+"""Tax information in checkout totals."""
+type CheckoutTotalsTax @doc(category: "Checkout") {
+  """Name of the tax."""
+  name: String
+  """Tax amount."""
+  amount: Float
+  """Tax rate as a percentage."""
+  rate: Float
+}
+
+"""
+Total amounts for a checkout including items, shipping, taxes, and discounts.
+"""
+type CheckoutTotals @doc(category: "Checkout") {
+  """Grand total amount to pay."""
+  grand: Float!
+  """Amount remaining to be paid."""
+  leftToPay: Float!
+  """Discount amount applied."""
+  discount: Float
+  """Total quantity of items (deprecated, use itemQuantity)."""
+  itemsQuantity: Float @deprecated
+  """Total quantity of items."""
+  itemQuantity: Int
+  """Subtotal including taxes."""
+  subtotal: Float!
+  """Subtotal before taxes are applied."""
+  subtotalBeforeTaxes: Float!
+  """Shipping cost."""
+  shipping: Float!
+  """List of taxes applied."""
+  taxes: [CheckoutTotalsTax!]!
+  """Total tax amount."""
+  tax: Float
+}
+
+"""URLs associated with a checkout."""
+type CheckoutUrls @doc(category: "Checkout") {
+  """URL to the checkout page."""
+  checkout: String!
+  """URL to the storefront homepage."""
+  storefront: String!
+}
+
+"""
+Represents a shopping cart checkout session with items, pricing, and buyer information.
+"""
+type Checkout @doc(category: "Checkout") {
+  """Internal database identifier."""
+  _id: ID!
+  """Checkout identifier string."""
+  id: String!
+  """Configuration reference for the shop."""
+  configRef: ID
+  """Origin of the checkout (e.g., "Online")."""
+  origin: String!
+  """Date when the checkout was created."""
+  created: Date!
+  """Shipping information."""
+  shipping: CheckoutShipping!
+  """Billing and payment information."""
+  billing: CheckoutBilling!
+  """Order identifier if the checkout has been converted to an order."""
+  orderId: String @deprecated
+  """Note or comment associated with the checkout."""
+  note: CheckoutNote
+  """Items in the checkout."""
+  items: [CheckoutLineItem!]!
+  """Buyer information."""
+  buyer: CheckoutBuyer
+  """Seller or shop user information."""
+  seller: CheckoutUser
+  """Date when the checkout was last updated."""
+  updated: Date
+  """Date when the checkout expires."""
+  expires: Date
+  """Current status of the checkout (e.g., "open", "complete")."""
+  status: String!
+  """Optional message about the checkout status."""
+  message: String
+  """Total amounts for the checkout."""
+  totals: CheckoutTotals!
+  """URLs associated with the checkout."""
+  urls: CheckoutUrls!
+  """Whether to use the same address for billing and shipping."""
+  useSingleAddress: Boolean
+}
+
+"""Input fields for buyer information in a checkout."""
+input CheckoutBuyerInput @doc(category: "Checkout") {
+  """Internal database identifier for an existing buyer."""
+  _id: String
+  """Email address of the buyer."""
+  email: String!
+  """Buyer's first name."""
+  firstName: String!
+  """Numeric identifier for the buyer."""
+  id: Float
+  """Buyer's last name."""
+  lastName: String!
+  """Full name of the buyer."""
+  name: String
+  """Telephone number."""
+  telephone: String
+  """Organization or company name."""
+  organisation: String
+  """Tax identification number."""
+  taxNumber: String
+  """Whether the buyer is a guest (not registered)."""
+  isGuest: Boolean
+}
+
+"""Input fields for voucher information."""
+input CheckoutVoucherInput @doc(category: "Checkout") {
+  """Voucher identifier string."""
+  id: String
+  """Voucher code or value."""
+  value: String
+  """Type of voucher redemption."""
+  redeemType: String
+}
+
+"""Input fields for billing information."""
+input CheckoutBillingInput @doc(category: "Checkout") {
+  """Billing address."""
+  address: AddressInput
+  """Voucher to apply."""
+  voucher: CheckoutVoucherInput
+}
+
+"""Input fields for email notification."""
+input CheckoutEmailInput @doc(category: "Checkout") {
+  """Email recipient address."""
+  recipient: String
+}
+
+"""Input fields for shipping information."""
+input CheckoutShippingInput @doc(category: "Checkout") {
+  """Shipping method identifier."""
+  method: String
+  """Shipping address."""
+  address: AddressInput
+  """Tracking number for shipped orders."""
+  tracking: String
+  """Shipping confirmation email information."""
+  confirmationEmail: CheckoutEmailInput
+  """Whether this is a shop collection order (pickup in store)."""
+  shopCollection: Boolean
+}
+
+"""Input fields for adding an item to a checkout."""
+input CheckoutItemInput @doc(category: "Checkout") {
+  """Numeric identifier for the listing."""
+  listingId: Float!
+  """Quantity of items to add."""
+  quantity: Float!
+}
+
+"""Response from verifying and updating a checkout."""
+type CheckoutVerifyAndUpdateResponse @doc(category: "Checkout") {
+  """Updated checkout information."""
+  checkout: Checkout
+  """Optional message about the verification or update."""
+  message: String
+}
+
+"""Response from a user verification operation."""
+type UserVerifyResponse @doc(category: "Sessions") {
+  """Created session for the verified user."""
+  session: Session
+  """Optional message about the verification."""
+  message: String
+  """Associated checkout if one exists."""
+  checkout: Checkout
+}
+
+type Query {
+  """
+  Retrieves shop configuration for a storefront by domain, configuration reference, or theme reference.
+  """
+  config(
+    """Domain name to look up the configuration."""
+    domain: String
+    """Configuration reference identifier."""
+    configRef: ID
+    """Theme reference identifier to load a specific theme."""
+    themeRef: ID
+  ): Config @doc(category: "Config") @cacheControl(maxAge: 10)
+  """Retrieves a single item by numeric ID or database reference."""
+  item(
+    """Numeric identifier for the item."""
+    id: Float
+    """Internal database reference for the item."""
+    itemRef: ID
+  ): Item @doc(category: "Items") @cacheControl(maxAge: 10)
+  """Retrieves multiple items by their numeric IDs."""
+  items(
+    """Array of numeric item identifiers."""
+    ids: [Float]!
+  ): [Item!]! @doc(category: "Items") @cacheControl(maxAge: 10)
+  """Retrieves the currently authenticated user."""
+  user: User @doc(category: "Users") @cacheControl(maxAge: 0)
+  """Retrieves a user by password reset token."""
+  userPasswordSession(
+    """Password reset token."""
+    token: String!
+  ): User @doc(category: "Users") @cacheControl(maxAge: 0)
+  """Retrieves the current user session."""
+  session: Session @doc(category: "Sessions") @cacheControl(maxAge: 0)
+  """Retrieves item suggestions based on filters and criteria."""
+  suggestions(
+    """Maximum number of suggestions to return."""
+    limit: Int
+    """Item ID to base suggestions on."""
+    id: Float
+    """Filter by genre."""
+    genre: String
+    """Filter by style."""
+    style: String
+    """Filter by item type."""
+    type: String
+    """Filter by multiple styles."""
+    styles: [String]
+    """Filter by multiple genres."""
+    genres: [String]
+    """Filter by categories."""
+    categories: [String]
+    """Filter by country."""
+    country: String
+  ): [Item!] @doc(category: "Items")
+  """Retrieves country data in JSON format."""
+  countries: JSON @doc(category: "Common") @cacheControl(maxAge: 3600)
+  """Searches for items matching the search term."""
+  search(
+    """Search query term."""
+    term: String!
+    """Whether to only return items that are in stock."""
+    stocked: Boolean
+  ): SearchResponse @doc(category: "Items")
+  """Retrieves a playlist by numeric ID."""
+  playlist(
+    """Numeric identifier for the playlist."""
+    id: Int!
+  ): Playlist @doc(category: "Playlists")
+  """Retrieves a single article by ID, homepage flag, or handle."""
+  article(
+    """Numeric identifier for the article."""
+    id: Int
+    """Whether to retrieve the homepage article."""
+    homepage: Boolean
+    """URL-friendly handle for the article."""
+    handle: String
+    """Whether to return preview content for unpublished articles."""
+    preview: Boolean
+  ): Article @doc(category: "Articles")
+  """Retrieves a list of articles with optional filtering and sorting."""
+  articles(
+    """Filter by article tags."""
+    tags: [String]
+    """Define a tags operation (AND, OR)."""
+    tagsOperator: String
+    """Filter by article type."""
+    type: String
+    """Field name to sort by."""
+    sortBy: String
+    """Sort order (1 for ascending, -1 for descending)."""
+    sortOrder: Int
+    """Maximum number of articles to return."""
+    limit: Int
+  ): [Article!]! @doc(category: "Articles")
+  """Retrieves a list of artists, optionally filtered by letter."""
+  artists(
+    """Filter artists by first letter of name."""
+    letter: String
+  ): [Artist!]! @doc(category: "Artists")
+  """Retrieves a list of labels, optionally filtered by letter."""
+  labels(
+    """Filter labels by first letter of name."""
+    letter: String
+  ): [Label!]! @doc(category: "Labels")
+  """Retrieves a paginated list of orders for the current user."""
+  orders(
+    """Page number to retrieve."""
+    page: Int
+  ): [Order!]! @doc(category: "Orders") @cacheControl(maxAge: 0)
+  """Retrieves a single order by ID with optional status filter."""
+  order(
+    """Order identifier string."""
+    id: String!
+    """Order status to filter by."""
+    status: String
+  ): Order @doc(category: "Orders") @cacheControl(maxAge: 0)
+  """Retrieves a checkout by identifier."""
+  checkout(
+    """Checkout identifier string."""
+    id: String!
+  ): Checkout @doc(category: "Checkout") @cacheControl(maxAge: 0)
+  """Retrieves a collection with its first page of items."""
+  collection(
+    """URL-friendly handle for the collection."""
+    handle: String
+    """Numeric identifier for the collection."""
+    id: Int
+    """Page number to retrieve."""
+    page: Int
+    """
+    Number of items per page. Your requested size is used if it does not exceed the server-enforced maximum limit.
+    """
+    limit: Int
+    """Sort order (1 for ascending, -1 for descending)."""
+    order: Int
+    """Field name to sort by."""
+    sort: String
+    """Whether to randomize the item order."""
+    randomise: Boolean
+  ): CollectionWithData @doc(category: "Collections")
+  """Retrieves a collection with paginated items."""
+  collectionItems(
+    """Numeric identifier for the collection."""
+    id: Int!
+    """Pagination and sorting parameters."""
+    pagination: PaginationInput!
+    """Whether to randomize the item order."""
+    randomise: Boolean!
+  ): CollectionItems @doc(category: "Collections")
+  """Retrieves pagination metadata for a collection."""
+  collectionPagination(
+    """Numeric identifier for the collection."""
+    id: Int!
+    """Pagination parameters."""
+    pagination: PaginationInput!
+  ): Pagination! @doc(category: "Collections")
+  """Retrieves a paginated inventory with filtering options."""
+  inventory(
+    """Lower bound for price range filter."""
+    from: String
+    """Upper bound for price range filter."""
+    to: String
+    """Filter for pre-order items only."""
+    preorder: Boolean
+    """Filter for pre-order status."""
+    preorders: String
+    """Filter by item type."""
+    type: String
+    """Filter by multiple item types."""
+    itemTypes: [String!]
+    """Filter by manufacturer names."""
+    manufacturers: [String]
+    """Filter by format types."""
+    types: [String]
+    """Maximum price filter."""
+    maxPrice: Int
+    """Filter by country codes."""
+    countries: [String]
+    """Filter by release years."""
+    years: [Int]
+    """Filter by artist identifiers."""
+    artists: [Float]
+    """Filter by label identifiers."""
+    labels: [Float]
+    """Filter by format names."""
+    formats: [String]
+    """Filter by medium types."""
+    mediums: [String]
+    """Filter by category names."""
+    categories: [String]
+    """Filter by stock status."""
+    stock: String
+    """Filter by item condition."""
+    condition: String
+    """Sort order (1 for ascending, -1 for descending)."""
+    order: Int
+    """Field name to sort by."""
+    sort: String
+    """
+    Number of items per page. Your requested size is used if it does not exceed the server-enforced maximum limit.
+    """
+    limit: Int
+    """The requested page number. Defaults to 1 if not specified."""
+    page: Int
+    """Filter by musical styles."""
+    styles: [String]
+    """Filter by musical genres."""
+    genres: [String]
+    """Filter for items in the user's wantlist."""
+    wantlist: Boolean
+    """Return all items without applying any filters."""
+    noFilters: Boolean
+    """Whether to randomize the item order."""
+    randomise: Boolean
+  ): Inventory @doc(category: "Items") @deprecated(reason: "Use inventoryItems with inventoryFiltersPagination instead")
+  """Retrieves paginated inventory items with filtering."""
+  inventoryItems(
+    """Filter criteria for the inventory query."""
+    filters: InventoryFiltersInput!
+    """Pagination and sorting parameters."""
+    pagination: PaginationInput!
+  ): InventoryItems! @doc(category: "Items")
+  """Retrieves paginated filter options for inventory filtering."""
+  inventoryFiltersPagination(
+    """Filter criteria to get options for."""
+    filters: InventoryFiltersInput!
+    """Pagination parameters for filter options."""
+    pagination: PaginationInput!
+  ): InventoryFiltersPagination! @doc(category: "Items")
+}
+
+input WithdrawalInput @doc(category: "Common") {
+  """Order number or any other reference provided by the customer."""
+  reference: String!
+  """Full name of the customer."""
+  name: String!
+  """Contact email address of the customer."""
+  email: String!
+  """Optional reason for the withdrawal / cancellation."""
+  reason: String
+}
+
+type Mutation {
+  """Updates checkout items in the existing checkout."""
+  checkoutUpdateItems(
+    """The identifier of the checkout to be updated."""
+    id: String!
+    """A list of items in the checkout."""
+    items: [CheckoutItemInput]
+  ): Checkout @doc(category: "Checkout")
+  """Updates billing and shipping addresses for a checkout."""
+  checkoutUpdateAddresses(
+    """Checkout identifier string."""
+    id: String!
+    """Billing address and voucher information."""
+    billing: CheckoutBillingInput
+    """Shipping address and method information."""
+    shipping: CheckoutShippingInput
+  ): Checkout @doc(category: "Checkout")
+  """Verifies checkout validity and throws an error if invalid."""
+  checkoutVerifyAndThrow(
+    """Checkout identifier string."""
+    id: String!
+  ): Checkout @doc(category: "Checkout")
+  """Verifies checkout validity and updates it if needed."""
+  checkoutVerifyAndUpdate(
+    """Checkout identifier string."""
+    id: String!
+  ): CheckoutVerifyAndUpdateResponse @doc(category: "Checkout")
+  """Associates a user account with a checkout."""
+  checkoutAssociateUser(
+    """Checkout identifier string."""
+    id: String!
+    """Additional user data in JSON format."""
+    data: JSON
+  ): Checkout @doc(category: "Checkout")
+  """Disassociates a user account from a checkout."""
+  checkoutDisassociateUser(
+    """Checkout identifier string."""
+    id: String!
+  ): Checkout @doc(category: "Checkout")
+  """Creates a new checkout session."""
+  checkoutCreate: Checkout @doc(category: "Checkout")
+  """
+  Updates checkout information including billing, shipping, and buyer details.
+  """
+  checkoutUpdate(
+    """Checkout identifier string."""
+    id: String!
+    """Billing address and voucher information."""
+    billing: CheckoutBillingInput
+    """Shipping address and method information."""
+    shipping: CheckoutShippingInput
+    """Buyer information."""
+    buyer: CheckoutBuyerInput
+    """Whether to create a user account for the buyer."""
+    createAccount: Boolean
+    """Whether to use the same address for billing and shipping."""
+    useSingleAddress: Boolean
+  ): Checkout @doc(category: "Checkout")
+  """Validates a voucher code for a checkout."""
+  validateVoucher(
+    """Checkout identifier string."""
+    id: String!
+    """Voucher identifier or code."""
+    voucherId: String!
+  ): CheckoutVoucher @doc(category: "Checkout")
+  """Applies a voucher to a checkout."""
+  addVoucher(
+    """Checkout identifier string."""
+    id: String!
+    """Voucher identifier or code."""
+    voucherId: String!
+  ): Checkout! @doc(category: "Checkout")
+  """Removes a voucher from a checkout."""
+  removeVoucher(
+    """Checkout identifier string."""
+    id: String!
+  ): Checkout! @doc(category: "Checkout")
+  """
+  Submits a customer contact request (currently an order withdrawal / cancellation). Records it as
+  an internal message visible in the Backoffice and notifies the shop admins.
+  """
+  contact(withdrawal: WithdrawalInput): String @doc(category: "Common")
+  """Authenticates a user with email and password."""
+  login(
+    """User's email address."""
+    email: String!
+    """User's password."""
+    password: String!
+    """Optional checkout identifier to associate with the session."""
+    checkoutId: String
+  ): LoginResponse @doc(category: "Sessions")
+  """Logs out the current user session."""
+  logout(
+    """Optional checkout identifier to preserve."""
+    checkoutId: String
+  ): LogoutResponse @doc(category: "Sessions")
+  """Records a play count for an audio track."""
+  playCount(
+    """Numeric identifier for the item."""
+    id: Float!
+    """Track position identifier."""
+    position: String!
+  ): String @doc(category: "Items")
+  """Adds an item to the user's wantlist."""
+  want(
+    """Numeric identifier for the item."""
+    id: Float!
+  ): Item @doc(category: "Items")
+  """Registers a new user account."""
+  register(
+    """Email address for the account."""
+    email: String!
+    """Password for the account."""
+    password: String!
+    """User's first name."""
+    firstName: String!
+    """User's last name."""
+    lastName: String!
+    """Telephone number."""
+    telephone: String
+    """Organization or company name."""
+    organisation: String
+    """Tax identification number."""
+    taxNumber: String
+    """Whether to send a verification code via email."""
+    withVerificationCode: Boolean
+    """Initial addresses for the user."""
+    addresses: [AddressInput!]
+  ): RegisterResponse @doc(category: "Sessions")
+  """Registers an analytics or tracking event."""
+  registerEvent(
+    """Type of event."""
+    type: String!
+    """Event data in JSON format."""
+    data: JSON!
+  ): Event @doc(category: "Common") @deprecated
+  """Records an analytics or tracking event."""
+  event(
+    """Event type identifier."""
+    event: String!
+    """Event metadata in JSON format."""
+    meta: JSON!
+  ): String @doc(category: "Common")
+  """Subscribes an email address to a customer list."""
+  listOptin(
+    """Customer list identifier."""
+    listRef: ID!
+    """Email address to subscribe."""
+    email: String!
+  ): String @doc(category: "Users")
+  """Unsubscribes an email address from a customer list."""
+  listOptout(
+    """Customer list identifier."""
+    listRef: ID!
+    """Email address to unsubscribe."""
+    email: String!
+    """Reason for unsubscribing."""
+    reason: String!
+  ): String @doc(category: "Users")
+  """Updates the current user's account information."""
+  userUpdate(
+    """New email address."""
+    email: String
+    """New password."""
+    password: String
+    """Updated first name."""
+    firstName: String
+    """Updated last name."""
+    lastName: String
+    """Updated telephone number."""
+    telephone: String
+    """Updated organization name."""
+    organisation: String
+    """Updated tax identification number."""
+    taxNumber: String
+    """Updated addresses."""
+    addresses: [AddressInput]
+    """Updated preferences in JSON format."""
+    preferences: JSON
+  ): User @doc(category: "Users")
+  """Creates a password reset token for a user."""
+  userCreatePasswordToken(
+    """Email address of the user account."""
+    email: String!
+    """Whether to send a verification code via email."""
+    withVerificationCode: Boolean
+  ): String @doc(category: "Users")
+  """Resets a user's password using a reset token."""
+  userPasswordReset(
+    """New password for the account."""
+    password: String!
+    """Password reset token."""
+    token: String!
+  ): String @doc(category: "Users")
+  """Verifies a password reset token and returns the user."""
+  userVerifyPasswordToken(
+    """Password reset token to verify."""
+    token: String!
+  ): User @doc(category: "Users")
+  """Verifies a user account using a token or verification code."""
+  userVerify(
+    """Verification token."""
+    token: String
+    """Verification code."""
+    code: Int
+    """Optional checkout identifier to associate with the session."""
+    checkoutId: String
+    """Email address for verification."""
+    email: String
+  ): UserVerifyResponse @doc(category: "Sessions")
+  """Creates a verification request for a user account."""
+  userCreateVerification(
+    """Email address to verify."""
+    email: String!
+    """Whether to send a verification code via email."""
+    withVerificationCode: Boolean
+  ): User! @doc(category: "Users")
+  """Adds a message to an order conversation thread."""
+  orderAddMessage(
+    """Order identifier string."""
+    id: String!
+    """Message content text."""
+    message: String!
+  ): Order @doc(category: "Orders")
+  """Archives audio snippets for an item."""
+  itemSnippetsArchive(
+    """Numeric identifier for the item."""
+    id: Float!
+  ): String! @doc(category: "Items")
+  """Deactivates the current buyer account."""
+  buyerDeactivate: String @doc(category: "Users")
+}
