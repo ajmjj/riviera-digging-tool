@@ -118,6 +118,24 @@ describe("001/FR-012: one client span per outbound call", () => {
     expect(new Headers(sent[0]?.init.headers).has("authorization")).toBe(false);
   });
 
+  it.each([
+    ["no data", { errors: [{ message: "boom" }] }],
+    ["data and errors", { data: { config: null }, errors: [{ message: "boom" }] }],
+  ])("001/FR-012: a 200 with GraphQL errors (%s) is failed, not success", async (_, body) => {
+    await expect(commonGround(json(200, body)).sampleShopConfig()).rejects.toMatchObject({
+      outcome: "failed",
+      message: "common_ground SampleShopConfig: unexpected response",
+    });
+    expect(await points("riviera.external.calls")).toEqual({ "common_ground/failed": 1 });
+  });
+
+  it("001/FR-012: a 200 with config null and an empty errors list is success", async () => {
+    const body = { data: { config: null }, errors: [] };
+    await expect(commonGround(json(200, body)).sampleShopConfig()).resolves.toEqual({
+      config: null,
+    });
+  });
+
   it("001/FR-012: the inlined document equals the codegen-validated .graphql file", () => {
     const path = "../../../packages/common-ground/operations/admin/SampleShopConfig.graphql";
     const file = readFileSync(new URL(path, import.meta.url), "utf8");

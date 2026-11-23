@@ -16,8 +16,10 @@ export const SAMPLE_SHOP_CONFIG_DOCUMENT = `query SampleShopConfig {
   }
 }`;
 
+// A GraphQL answer with any `errors` is a failed call, even when it also carries `data`.
 const sampleShopConfigResponse: z.ZodType<{ data: Admin.SampleShopConfigQuery }> = z.object({
   data: z.object({ config: z.object({ shopName: z.string() }).nullable() }),
+  errors: z.array(z.unknown()).length(0).optional(),
 });
 
 export interface CommonGround {
