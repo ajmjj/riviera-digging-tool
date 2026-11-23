@@ -368,6 +368,29 @@ describe("001/FR-009: the poll loop", () => {
     });
   });
 
+  it("001/FR-009: a heartbeat still in flight when the attempt ends lands before complete", async () => {
+    const order: string[] = [];
+    const worker = runner(() => sleep(15), {
+      heartbeatMs: 10,
+      queue: {
+        ...queue,
+        heartbeat: async (id, attempt) => {
+          await sleep(40);
+          order.push("heartbeat");
+          return queue.heartbeat(id, attempt);
+        },
+        complete: (id, attempt, traceParent) => {
+          order.push("complete");
+          return queue.complete(id, attempt, traceParent);
+        },
+      },
+    });
+    await queue.enqueue(NAME, PAYLOAD);
+    await worker.runOnce();
+    expect(order).toEqual(["heartbeat", "complete"]);
+    expect(lines.filter((l) => l["level"] === "warn")).toEqual([]);
+  });
+
   it("001/FR-009: a lost lease, a failing heartbeat and a stale complete are logged", async () => {
     let beat = 0;
     const worker = runner(

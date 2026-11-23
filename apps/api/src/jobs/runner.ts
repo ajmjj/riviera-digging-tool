@@ -133,8 +133,11 @@ export function createRunner(options: RunnerOptions): Runner {
       attempt: job.attempt,
       ...(job.staffId === null ? {} : { staff_id: job.staffId }),
     });
+    // The heartbeat in flight, if any; awaited before the outcome is stored, so a heartbeat that
+    // lands after `complete`/`fail` can't report a lease lost for an attempt that finished.
+    let beating: Promise<void> = Promise.resolve();
     const heartbeat = setInterval(() => {
-      queue.heartbeat(job.id, job.attempt).then(
+      beating = queue.heartbeat(job.id, job.attempt).then(
         (owned) => {
           if (!owned) {
             runLog.warn("job lease lost");
@@ -161,6 +164,7 @@ export function createRunner(options: RunnerOptions): Runner {
       clearInterval(heartbeat);
     }
     const seconds = (now() - started) / 1000;
+    await beating;
     const outcome = failure === undefined ? "succeeded" : "failed";
     span.setAttribute("riviera.job.outcome", outcome);
     if (failure !== undefined) {
