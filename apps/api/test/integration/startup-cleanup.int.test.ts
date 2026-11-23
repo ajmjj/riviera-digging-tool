@@ -9,7 +9,12 @@ import { freshDatabase, type FreshDatabase } from "./fresh-database.ts";
 // review of T016 on PR #41): a failing telemetry shutdown still closes the pool, and a failure
 // while wiring the service still shuts down the telemetry SDK it had started. The real modules run; these wrappers only inject the faults.
 
-const faults = vi.hoisted(() => ({ shutdown: false, buildApp: false, shutdowns: 0 }));
+const faults = vi.hoisted(() => ({
+  shutdown: false,
+  buildApp: false,
+  shutdowns: 0,
+  onFlush: (): void => undefined,
+}));
 
 vi.mock("@riviera/telemetry/sdk", async (importOriginal) => {
   const actual = await importOriginal<typeof Sdk>();
@@ -20,7 +25,11 @@ vi.mock("@riviera/telemetry/sdk", async (importOriginal) => {
       await telemetry.shutdown();
       if (faults.shutdown) throw new Error("telemetry shutdown failed");
     };
-    return { ...telemetry, shutdown };
+    const forceFlush = async (): Promise<void> => {
+      faults.onFlush();
+      await telemetry.forceFlush();
+    };
+    return { ...telemetry, shutdown, forceFlush };
   };
   return { ...actual, startTelemetry };
 });
@@ -43,7 +52,12 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  Object.assign(faults, { shutdown: false, buildApp: false, shutdowns: 0 });
+  Object.assign(faults, {
+    shutdown: false,
+    buildApp: false,
+    shutdowns: 0,
+    onFlush: () => undefined,
+  });
   await db.drop();
 });
 
@@ -80,5 +94,13 @@ describe("001/FR-029: startup and shutdown release every resource", () => {
     faults.buildApp = true;
     await expect(startService(config(), new EventEmitter())).rejects.toThrow("buildApp failed");
     expect(faults.shutdowns).toBe(1);
+  });
+
+  it("001/FR-029: a SIGTERM during setup stops startup instead of being lost", async () => {
+    const signals = new EventEmitter();
+    faults.onFlush = () => signals.emit("SIGTERM");
+    await expect(startService(config(), signals)).rejects.toThrow("startup stopped by SIGTERM");
+    expect(faults.shutdowns).toBe(1);
+    expect(signals.listenerCount("SIGINT")).toBe(1);
   });
 });

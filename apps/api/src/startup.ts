@@ -91,8 +91,19 @@ export async function startService(
     ]);
     return stopping;
   };
-  signals.once("SIGTERM", () => void stop());
-  signals.once("SIGINT", () => void stop());
+  // A signal during setup can't stop what doesn't exist yet: it is noted, and setup gives up at
+  // its next step, closing what it had created. Once started, a signal stops the service.
+  let started = false;
+  let signalled: string | undefined;
+  const onSignal = (signal: "SIGTERM" | "SIGINT") => () => {
+    if (started) void stop();
+    else signalled ??= signal;
+  };
+  const giveUpIfSignalled = (): void => {
+    if (signalled !== undefined) throw new Error(`startup stopped by ${signalled}`);
+  };
+  signals.once("SIGTERM", onSignal("SIGTERM"));
+  signals.once("SIGINT", onSignal("SIGINT"));
 
   try {
     telemetry = startTelemetry({
@@ -146,7 +157,10 @@ export async function startService(
 
     instruments.zeroInitialise();
     await telemetry.forceFlush();
+    giveUpIfSignalled();
     await app.listen({ host: "0.0.0.0", port: config.port });
+    giveUpIfSignalled();
+    started = true;
     // After listen: jobs run only once the zeros are exported and the health checks answer.
     runner?.start();
   } catch (error) {
