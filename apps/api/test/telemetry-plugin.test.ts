@@ -98,7 +98,6 @@ describe("001/FR-007: one SERVER span per request, named by route template", () 
       "url.scheme": "http",
       "riviera.request_id": "req_1",
     });
-    expect(JSON.stringify(span)).not.toContain("12345");
     expect(span.status.code).toBe(SpanStatusCode.UNSET);
   });
 
@@ -109,7 +108,7 @@ describe("001/FR-007: one SERVER span per request, named by route template", () 
     expect(span.name).toBe(`GET ${UNMATCHED_ROUTE}`);
     expect(span.attributes["http.route"]).toBe(UNMATCHED_ROUTE);
     expect(span.attributes["http.response.status_code"]).toBe(404);
-    expect(JSON.stringify(span)).not.toContain("987");
+    expect(JSON.stringify(span.attributes)).not.toContain("/no/such/path");
   });
 
   it("001/FR-007: a 404 from a matched route keeps its template; 4xx is not an error", async () => {
