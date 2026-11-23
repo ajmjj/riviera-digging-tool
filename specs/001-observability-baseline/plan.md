@@ -102,7 +102,7 @@ No open `NEEDS CLARIFICATION`: every unknown is resolved in research.md.
 specs/001-observability-baseline/
 ├── spec.md
 ├── plan.md              # this file
-├── research.md          # Phase 0: decisions R1–R17
+├── research.md          # Phase 0: decisions R1–R18
 ├── data-model.md        # Phase 1: request context, job, metric registry, SLO dashboards
 ├── quickstart.md        # Phase 1: run and verify end to end
 ├── contracts/

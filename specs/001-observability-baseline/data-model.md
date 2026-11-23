@@ -91,8 +91,8 @@ Source of truth: `ci/slo-catalog.json` (`id`, `name`, `objective`, `metrics`). J
 | `id` | catalog SLO id; dashboard UID `slo-<id>`, file `observability/grafana/dashboards/slo/<id>.json` |
 | `title` | catalog `name` |
 | `objectives[]` | one or two per SLO: `{ label, target, sli: PromQL ratio over 28d }` |
-| `budget` | derived per objective: `1 - (1 - SLI) / (1 - target)`, shown as % remaining; for a 100% target (checkout `paid_after_mismatch = 0`) the formula would divide by zero, so the budget is 100% when the bad-event count over the window is 0 and 0% (exhausted) otherwise. Because no zero values are emitted, `paid_after_mismatch` has no series until the first mismatch, so the panel's "has data" state comes from the paid checkouts: `sum(increase(riviera_checkout_paid_after_mismatch_total[28d])) or (sum(increase(riviera_checkout_finished_total{outcome="paid"}[28d])) * 0)`; it shows "No data recorded yet" only while there are no paid checkouts either |
-| `noData` | `"No data recorded yet"` on every stat panel (FR-025) |
+| `budget` | derived per objective: `1 - (1 - SLI) / (1 - target)`, shown as % remaining; for a 100% target (checkout `paid_after_mismatch = 0`) the formula would divide by zero, so the budget is 100% when the bad-event count over the window is 0 and 0% (exhausted) otherwise. Counters are zero-initialised at startup (R18), so `sum(increase(riviera_checkout_paid_after_mismatch_total[28d]))` counts the first mismatch too |
+| `noData` | `"No data recorded yet"` on every stat panel (FR-025). Because counters are zero-initialised, an empty window is detected by counts, not by missing series: each objective has a `hasData` query (the SLO's total-events count over 28 d, e.g. `riviera.verdict.requests`, `riviera.checkout.started`, a histogram's `_count`) and its SLI/budget panels return no value while `hasData` is 0, via `… and on() (hasData > 0)` |
 
 Rules (unit tests): ids in `slo-queries.ts` equal the catalog ids; every metric a query names is
 in that SLO's catalog `metrics` (translated to its Prometheus name); the committed JSON equals the

@@ -227,8 +227,10 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
      Common Ground spans) and the job trace (job and Discogs spans, link to the request);
      Loki `query_range` for log lines with that `trace_id`; Prometheus for the http, job,
      external and queue-depth series.
-  4. Push one sample data point per SLO metric over OTLP (resource
-     `service.name=riviera-slo-sample`) and assert each SLO dashboard's SLI and budget panels
+  4. Push sample data for every SLO metric over OTLP (resource
+     `service.name=riviera-slo-sample`): two data points per series, the first at 0 (counters)
+     or a first observation (histograms), the second with a real increase, at least one export
+     interval apart so Prometheus stores both, then assert each SLO dashboard's SLI and budget panels
      now return a value through Grafana's `/api/ds/query` (US3-3).
   5. Grafana `/api/search`: exactly 7 dashboards in the "SLOs" folder with UIDs `slo-<id>`
      from the catalog, plus `overview`.
@@ -286,6 +288,26 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
 - **Alternatives**: flag on in `.env.example` plus a documented "turn it off on the host"
   (fails open, as the reviewer pointed out); a separate override file (the constitution asks
   for profiles).
+
+## R18. Counters start at zero; "no data" comes from counts **(check)**
+
+- **Decision**: at startup the api and worker add 0 to every counter for every combination of its
+  closed label values (`zeroInitialise()`), then force-flush the metric reader before they start
+  serving or polling. `riviera.queue.depth` reports 0 for every registered job name with no queued
+  rows. Dashboards decide "No data recorded yet" (FR-025) with a per-objective `hasData` query
+  (total events in the 28-day window > 0), not by a series being absent.
+- **Why**: Prometheus's `increase()` needs a sample before the first change. A counter series
+  that first appears at 1 loses that first event, which for the checkout `paid_after_mismatch`
+  SLO would hide exactly the violation it exists to catch. Zero samples also make FR-014's
+  "registered and exported at startup" literally true.
+- **Limits**: a histogram can't be zero-initialised without an observation, so the first-ever
+  observation of a new histogram series may be missed by `increase()`. With many observations
+  this is noise; T014 also turns on Prometheus's created-timestamp zero ingestion for OTLP if the
+  pinned version supports it, and documents what it found. `riviera.sync.last_success` is never
+  zero-initialised (0 would read as 1970).
+- **Alternatives**: rely on Prometheus created-timestamp ingestion alone (version-dependent,
+  and not verifiable until T014); PromQL workarounds such as `or` on the raw series (complex
+  and easy to get wrong per panel).
 
 ## Also decided (no check needed)
 

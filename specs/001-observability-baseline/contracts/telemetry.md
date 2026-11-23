@@ -45,7 +45,11 @@ OTel name → Prometheus name after OTLP translation (research R7). All labels a
 
 `riviera.queue.depth` is observed by both the api and the worker at each export (one
 `SELECT name, count(*) FROM job WHERE status = 'queued' GROUP BY name`, no span because no span
-is active), so it stays visible while the worker is down; dashboards take `max by (job_name)`.
+is active), so it stays visible while the worker is down; every registered job name with no queued
+rows reports 0, so the panel drops back once the queue drains; dashboards take `max by (job_name)`.
+
+All counters are zero-initialised at startup for every combination of their closed label values
+(research R18); histograms and `riviera.sync.last_success` appear from their first observation.
 
 ### SLO metrics (catalog, FR-014; recorded by later features)
 
