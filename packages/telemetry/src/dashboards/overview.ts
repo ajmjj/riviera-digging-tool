@@ -9,16 +9,22 @@ const RATE = "$__rate_interval";
 const RANGE = "$__range";
 
 const httpCount = promSeries("riviera.http.server.duration", "count");
-const httpBucket = promSeries("riviera.http.server.duration", "bucket");
 const jobRuns = promName("riviera.jobs.runs");
 const jobFailures = promName("riviera.jobs.failures");
-const jobBucket = promSeries("riviera.jobs.duration", "bucket");
 const queueDepth = promName("riviera.queue.depth");
 const externalCalls = promName("riviera.external.calls");
-const externalBucket = promSeries("riviera.external.duration", "bucket");
 
-function quantile(q: number, bucket: string, by: string): string {
-  return `histogram_quantile(${String(q)}, sum by (${by}, le) (rate(${bucket}[${RATE}])))`;
+type Histogram = Parameters<typeof promSeries>[0];
+
+/**
+ * The q-quantile of a histogram per `by` group. A group with no observations in the window would
+ * be NaN, so it is dropped unless its `_count` rate is above 0, as on the SLO p95 graph; the
+ * panel then shows "No data recorded yet" instead of NaN.
+ */
+function quantile(q: number, histogram: Histogram, by: string): string {
+  const bucket = promSeries(histogram, "bucket");
+  const count = promSeries(histogram, "count");
+  return `histogram_quantile(${String(q)}, sum by (${by}, le) (rate(${bucket}[${RATE}]))) and on(${by}) (sum by (${by}) (rate(${count}[${RATE}])) > 0)`;
 }
 
 export const OVERVIEW_FILE = "service/overview.json";
@@ -54,8 +60,8 @@ export function overviewDashboard(): Dashboard {
         ],
       ),
       timeseries("Latency by route", "Request duration, p50 and p95.", "s", [
-        { expr: quantile(0.5, httpBucket, "route"), legend: "{{route}} p50" },
-        { expr: quantile(0.95, httpBucket, "route"), legend: "{{route}} p95" },
+        { expr: quantile(0.5, "riviera.http.server.duration", "route"), legend: "{{route}} p50" },
+        { expr: quantile(0.95, "riviera.http.server.duration", "route"), legend: "{{route}} p95" },
       ]),
       stat("Requests in range", "Requests per route over the selected time range.", "short", [
         { expr: `sum by (route) (increase(${httpCount}[${RANGE}]))`, legend: "{{route}}" },
@@ -86,7 +92,7 @@ export function overviewDashboard(): Dashboard {
         ],
       ),
       timeseries("Job duration", "Job attempt duration, p95.", "s", [
-        { expr: quantile(0.95, jobBucket, "job_name"), legend: "{{job_name}} p95" },
+        { expr: quantile(0.95, "riviera.jobs.duration", "job_name"), legend: "{{job_name}} p95" },
       ]),
 
       row("Common Ground and Discogs"),
@@ -103,7 +109,7 @@ export function overviewDashboard(): Dashboard {
       ),
       timeseries("Call latency", "Outbound call duration, p95.", "s", [
         {
-          expr: quantile(0.95, externalBucket, "service, operation"),
+          expr: quantile(0.95, "riviera.external.duration", "service, operation"),
           legend: "{{service}} {{operation}} p95",
         },
       ]),

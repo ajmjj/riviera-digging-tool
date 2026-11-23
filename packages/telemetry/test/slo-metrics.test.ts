@@ -87,6 +87,20 @@ describe("metric registry", () => {
     }
   });
 
+  it("001/FR-018: the HTTP method label is the known methods plus _OTHER for any other", () => {
+    const http = registry.find((def) => def.name === "riviera.http.server.duration");
+    expect(http?.labels["method"]).toEqual([
+      "GET",
+      "HEAD",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+      "_OTHER",
+    ]);
+  });
+
   it.each(registry.map((def) => [def.name, def] as const))(
     "001/FR-014: %s is well-formed",
     (name, def) => {

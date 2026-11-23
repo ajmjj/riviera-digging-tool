@@ -224,6 +224,42 @@ describe("001/FR-017, 001/FR-018: riviera.http.server.duration with bounded labe
     expect(await series()).toEqual({ [`${UNMATCHED_ROUTE} GET 2xx`]: 1 });
   });
 
+  it("001/FR-018: a route the plugin never saw is warned about once per template", async () => {
+    const lines: string[] = [];
+    const logger: FastifyBaseLogger = createLogger({
+      service: "riviera-api",
+      env: "ci",
+      level: "info",
+      write: (line) => lines.push(line),
+    });
+    const early = Fastify({ loggerInstance: logger });
+    early.get("/early/:id", () => ({ ok: true }));
+    early.get("/before", () => ({ ok: true }));
+    registerTelemetry(early, otel());
+    early.get("/after", () => ({ ok: true }));
+    for (const url of ["/early/1", "/early/2", "/before", "/before", "/after", "/nowhere"]) {
+      await early.inject(url);
+    }
+    await early.close();
+    const warnings = lines
+      .map((line): unknown => JSON.parse(line))
+      .filter(isRecord)
+      .filter((line) => line["level"] === "warn");
+    expect(warnings.map((line) => [line["route"], line["msg"]])).toEqual(
+      ["/early/:id", "/before"].map((route) => [
+        route,
+        "route registered before the telemetry plugin; its requests are counted as unmatched",
+      ]),
+    );
+  });
+
+  it("001/FR-018: routes registered after the plugin raise no warning", async () => {
+    await app.inject("/records/1");
+    await app.inject("/no/such/path");
+    const levels = raw.map((line): unknown => JSON.parse(line)).filter(isRecord);
+    expect(levels.filter((line) => line["level"] === "warn")).toEqual([]);
+  });
+
   it("001/FR-007: a request the client aborts still ends and exports its span, without a status code or metric point", async () => {
     const handling = new Promise<void>((resolve) => {
       app.get("/slow", () => (resolve(), new Promise(() => undefined)));

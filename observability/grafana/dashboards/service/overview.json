@@ -154,7 +154,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket[$__rate_interval]))) and on(route) (sum by (route) (rate(riviera_http_server_duration_seconds_count[$__rate_interval])) > 0)",
           "legendFormat": "{{route}} p50",
           "range": true,
           "instant": false
@@ -165,7 +165,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket[$__rate_interval]))) and on(route) (sum by (route) (rate(riviera_http_server_duration_seconds_count[$__rate_interval])) > 0)",
           "legendFormat": "{{route}} p95",
           "range": true,
           "instant": false
@@ -414,7 +414,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (job_name, le) (rate(riviera_jobs_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (job_name, le) (rate(riviera_jobs_duration_seconds_bucket[$__rate_interval]))) and on(job_name) (sum by (job_name) (rate(riviera_jobs_duration_seconds_count[$__rate_interval])) > 0)",
           "legendFormat": "{{job_name}} p95",
           "range": true,
           "instant": false
@@ -521,7 +521,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (service, operation, le) (rate(riviera_external_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (service, operation, le) (rate(riviera_external_duration_seconds_bucket[$__rate_interval]))) and on(service, operation) (sum by (service, operation) (rate(riviera_external_duration_seconds_count[$__rate_interval])) > 0)",
           "legendFormat": "{{service}} {{operation}} p95",
           "range": true,
           "instant": false

@@ -35,7 +35,7 @@ OTel name → Prometheus name after OTLP translation (research R7). All labels a
 
 | OTel name | Kind, unit | Labels | Prometheus |
 |---|---|---|---|
-| `riviera.http.server.duration` | histogram, s; buckets .005 .01 .025 .05 .1 .25 .3 .5 1 2.5 5 | `route`, `method`, `status_class` (`1xx`…`5xx`) | `riviera_http_server_duration_seconds_*` |
+| `riviera.http.server.duration` | histogram, s; buckets .005 .01 .025 .05 .1 .25 .3 .5 1 2.5 5 | `route`, `method` (`GET`\|`HEAD`\|`POST`\|`PUT`\|`PATCH`\|`DELETE`\|`OPTIONS`, `_OTHER` for any other method), `status_class` (`1xx`…`5xx`) | `riviera_http_server_duration_seconds_*` |
 | `riviera.external.calls` | counter, `{call}` | `service`, `operation`, `outcome` (`success`\|`failed`\|`rate_limited`) | `riviera_external_calls_total` |
 | `riviera.external.duration` | histogram, s; buckets .05 .1 .25 .5 1 2.5 5 10 | `service`, `operation`, `outcome` | `riviera_external_duration_seconds_*` |
 | `riviera.jobs.runs` | counter, `{run}` | `job_name`, `outcome` (`succeeded`\|`failed`) | `riviera_jobs_runs_total` |
