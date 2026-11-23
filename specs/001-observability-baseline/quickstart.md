@@ -71,7 +71,7 @@ From the trace above, the job trace is under the producer span's links (or searc
   panel goes up by one (US2-4).
 - Queue depth (US2-5): `docker compose stop worker`, send three sample requests, the overview's
   queue-depth panel shows 3 after the api's next metric export (≤ 5 s); `docker compose start
-  worker` drains it.
+  worker` drains it and the panel drops back to 0 (research R18).
 
 ## 5. SLO dashboards (US3)
 
