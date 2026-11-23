@@ -5,5 +5,8 @@
   "type": "module",
   "exports": {
     "./slo-metrics": "./src/slo-metrics.ts"
+  },
+  "devDependencies": {
+    "fast-check": "4.11.0"
   }
 }
