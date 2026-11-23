@@ -1,0 +1,13 @@
+# Prometheus, research R7/R10. No scrape jobs: the collector pushes metrics to the OTLP receiver
+# (`--web.enable-otlp-receiver`, set in docker-compose.yml with the 30-day retention).
+global:
+  evaluation_interval: 15s
+
+otlp:
+  promote_resource_attributes: [service.name, deployment.environment.name]
+  translation_strategy: UnderscoreEscapingWithSuffixes
+
+storage:
+  tsdb:
+    # OTLP batches can arrive slightly out of order.
+    out_of_order_time_window: 30m
