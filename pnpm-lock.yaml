@@ -68,6 +68,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@opentelemetry/api':
+        specifier: 1.10.0
+        version: 1.10.0
+      '@riviera/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       fastify:
         specifier: 5.12.8
         version: 5.12.8
