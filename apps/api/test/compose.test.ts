@@ -111,7 +111,7 @@ describe("compose profile observability", () => {
     }
   });
 
-  it("001/FR-023: Loki and Tempo keep 7 days on named volumes", () => {
+  it("001/FR-021: Loki and Tempo keep 7 days (research R10) on named volumes", () => {
     const volumes = Object.keys(record(compose["volumes"], "volumes"));
     for (const name of ["loki", "tempo", "prometheus"]) {
       const mounts = strings(service(name)["volumes"]);
