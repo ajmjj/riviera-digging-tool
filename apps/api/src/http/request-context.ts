@@ -61,14 +61,18 @@ export interface StaffTarget {
 
 /**
  * Marks a request (or anything else with a child logger) as acting for a staff member: later
- * lines carry `staff_id`, and the active span gets `riviera.staff_id` (FR-004). Only the
- * pseudonymous ID is accepted; the error never repeats the rejected value, which may be an
+ * lines carry `staff_id`, and the active span gets `riviera.staff_id` (FR-004). Pass the reply
+ * as well inside a route, since Fastify writes "request completed" through `reply.log`. Only
+ * the pseudonymous ID is accepted; the error never repeats the rejected value, which may be an
  * email address.
  */
-export function withStaff(target: StaffTarget, staffId: string): void {
+export function withStaff(target: StaffTarget, staffId: string, ...also: StaffTarget[]): void {
   if (!isStaffId(staffId)) {
     throw new TypeError("withStaff: not a pseudonymous staff ID");
   }
-  target.log = target.log.child({ staff_id: staffId });
+  const log = target.log.child({ staff_id: staffId });
+  for (const each of [target, ...also]) {
+    each.log = log;
+  }
   trace.getActiveSpan()?.setAttribute("riviera.staff_id", staffId);
 }

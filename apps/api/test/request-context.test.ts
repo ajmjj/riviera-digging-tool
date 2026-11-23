@@ -120,10 +120,10 @@ describe("withStaff (001/FR-004)", () => {
     const telemetry = startTestTelemetry();
     try {
       const server = appWith();
-      server.get("/staff", (request) => {
+      server.get("/staff", (request, reply) => {
         request.log.info("before staff");
         trace.getTracer("t").startActiveSpan("handler", (span) => {
-          withStaff(request, "staff_test_0001");
+          withStaff(request, "staff_test_0001", reply);
           span.end();
         });
         request.log.info("as staff");
@@ -133,6 +133,7 @@ describe("withStaff (001/FR-004)", () => {
       const byMessage = new Map(lines().map((line) => [line["msg"], line]));
       expect(byMessage.get("before staff")).not.toHaveProperty("staff_id");
       expect(byMessage.get("as staff")).toMatchObject({ staff_id: "staff_test_0001" });
+      expect(byMessage.get("request completed")).toMatchObject({ staff_id: "staff_test_0001" });
       const spans = await telemetry.spans();
       expect(spans.map((span) => span.attributes["riviera.staff_id"])).toEqual(["staff_test_0001"]);
     } finally {

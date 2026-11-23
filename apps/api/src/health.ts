@@ -4,7 +4,9 @@ export interface HealthDeps {
   readonly pingDatabase: () => Promise<void>;
 }
 
-const HEALTH_ROUTES: ReadonlySet<string> = new Set(["/healthz", "/readyz"]);
+const HEALTHZ = "/healthz";
+const READYZ = "/readyz";
+const HEALTH_ROUTES: ReadonlySet<string> = new Set([HEALTHZ, READYZ]);
 
 /**
  * 001/FR-007: healthchecks write no per-request lines (the app turns Fastify's request logging
@@ -21,9 +23,9 @@ export function isHealthRequest(request: FastifyRequest): boolean {
  * when the Common Ground sync lands.
  */
 export function registerHealthRoutes(app: FastifyInstance, deps: HealthDeps): void {
-  app.get("/healthz", () => ({ status: "ok" }));
+  app.get(HEALTHZ, () => ({ status: "ok" }));
 
-  app.get("/readyz", async (request, reply) => {
+  app.get(READYZ, async (request, reply) => {
     try {
       await deps.pingDatabase();
       return { status: "ready", checks: { database: "ok" } };
