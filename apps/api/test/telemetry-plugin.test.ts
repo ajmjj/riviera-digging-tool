@@ -121,12 +121,12 @@ describe("001/FR-007: one SERVER span per request, named by route template", () 
     expect(span.events.map((event) => event.name)).toEqual(["exception"]);
   });
 
-  it("001/FR-007: an unknown method is not echoed into the span name", async () => {
+  it("001/FR-007, 001/FR-017: an unknown method is recorded as _OTHER, never echoed", async () => {
     await app.inject({ method: "PROPFIND", url: "/records/1" });
     const span = await onlySpan();
     expect(span.name).toBe(`_OTHER ${UNMATCHED_ROUTE}`);
     expect(span.attributes["http.request.method"]).toBe("_OTHER");
-    expect(await series()).toEqual({});
+    expect(await series()).toEqual({ [`${UNMATCHED_ROUTE} _OTHER 4xx`]: 1 });
   });
 
   it("001/FR-007: the span is active in the handler: log lines carry its trace and span IDs", async () => {

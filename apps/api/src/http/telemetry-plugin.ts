@@ -33,8 +33,9 @@ const METHODS: readonly Labels["method"][] = [
   "OPTIONS",
 ];
 
-function knownMethod(method: string): Labels["method"] | undefined {
-  return METHODS.find((known) => known === method);
+/** Any method outside the closed set is `_OTHER` (semantic conventions), in spans and metrics. */
+function methodLabel(method: string): Labels["method"] {
+  return METHODS.find((known) => known === method) ?? "_OTHER";
 }
 
 function statusClass(code: number): Labels["status_class"] {
@@ -77,8 +78,7 @@ export function registerTelemetry(app: FastifyInstance, options: TelemetryPlugin
       return;
     }
     const route = request.routeOptions.url ?? UNMATCHED_ROUTE;
-    // Unknown methods are not echoed into span names (semantic conventions' `_OTHER`).
-    const method = knownMethod(request.method) ?? "_OTHER";
+    const method = methodLabel(request.method);
     // A missing or malformed `traceparent` extracts nothing, so the span starts a new trace.
     const parent = propagation.extract(ROOT_CONTEXT, request.headers);
     const span = options.tracer.startSpan(
@@ -130,16 +130,12 @@ export function registerTelemetry(app: FastifyInstance, options: TelemetryPlugin
     }
     span.end();
 
-    const method = knownMethod(request.method);
-    // A method outside the closed label set has no series; its span still records it.
-    if (method !== undefined) {
-      const route = request.routeOptions.url;
-      instruments?.record("riviera.http.server.duration", reply.elapsedTime / 1000, {
-        route: route !== undefined && routes.has(route) ? route : UNMATCHED_ROUTE,
-        method,
-        status_class: statusClass(code),
-      });
-    }
+    const route = request.routeOptions.url;
+    instruments?.record("riviera.http.server.duration", reply.elapsedTime / 1000, {
+      route: route !== undefined && routes.has(route) ? route : UNMATCHED_ROUTE,
+      method: methodLabel(request.method),
+      status_class: statusClass(code),
+    });
     done();
   });
 }
