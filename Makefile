@@ -24,7 +24,7 @@ smoke: ## Run the smoke test against the running stack
 check: ## Static checks and unit tests (no database needed)
 	pnpm format && pnpm lint && pnpm typecheck && pnpm knip && pnpm fr-trace && pnpm test
 
-TEST_DB_IMAGE := postgres:18-alpine@sha256:0115267ab5a509022df9319c77be365cef335adb71556c75f60f5360ee247e71
+TEST_DB_IMAGE := postgres:19-alpine@sha256:8b0ff4cdf221f0c53d7fcda681d3b461be725c492cd881c5ec9c0ad25023f188
 TEST_DB_URL := postgres://postgres:test@127.0.0.1:55432/riviera_test
 
 test-integration: ## All tests with coverage against a throwaway Postgres on 127.0.0.1:55432
