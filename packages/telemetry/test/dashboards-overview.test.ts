@@ -118,6 +118,8 @@ describe("dashboard builders", () => {
       [6, "s2", { x: 0, y: 18, w: 12, h: 8 }],
     ]);
     expect(panels[3]?.options).toHaveProperty("reduceOptions");
+    expect(panels[3]?.targets).toMatchObject([{ instant: true, range: false }]);
+    expect(panels[1]?.targets).toMatchObject([{ instant: false, range: true }]);
     expect(panels[1]?.options).toHaveProperty("legend");
   });
 
@@ -138,7 +140,10 @@ describe("service overview dashboard", () => {
     expect(exprsOf("Request rate by route")).toEqual([
       "sum by (route) (rate(riviera_http_server_duration_seconds_count[$__rate_interval]))",
     ]);
-    expect(exprsOf("Errors by route").join("\n")).toContain('status_class="5xx"');
+    expect(exprsOf("Errors by route")).toEqual([
+      'sum by (route) (rate(riviera_http_server_duration_seconds_count{status_class="5xx"}[$__rate_interval]))',
+      'sum by (route) (rate(riviera_http_server_duration_seconds_count{status_class="4xx"}[$__rate_interval]))',
+    ]);
     for (const expr of exprsOf("Latency by route")) {
       expect(expr).toMatch(
         /^histogram_quantile\(0\.\d+, sum by \(route, le\) \(rate\(riviera_http_server_duration_seconds_bucket\[\$__rate_interval\]\)\)\)$/,

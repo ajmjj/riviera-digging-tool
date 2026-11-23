@@ -49,7 +49,8 @@
           },
           "expr": "sum by (route) (rate(riviera_http_server_duration_seconds_count[$__rate_interval]))",
           "legendFormat": "{{route}}",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -96,7 +97,8 @@
           },
           "expr": "sum by (route) (rate(riviera_http_server_duration_seconds_count{status_class=\"5xx\"}[$__rate_interval]))",
           "legendFormat": "{{route}} 5xx",
-          "range": true
+          "range": true,
+          "instant": false
         },
         {
           "refId": "B",
@@ -106,7 +108,8 @@
           },
           "expr": "sum by (route) (rate(riviera_http_server_duration_seconds_count{status_class=\"4xx\"}[$__rate_interval]))",
           "legendFormat": "{{route}} 4xx",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -153,7 +156,8 @@
           },
           "expr": "histogram_quantile(0.5, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "{{route}} p50",
-          "range": true
+          "range": true,
+          "instant": false
         },
         {
           "refId": "B",
@@ -163,7 +167,8 @@
           },
           "expr": "histogram_quantile(0.95, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "{{route}} p95",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -210,7 +215,8 @@
           },
           "expr": "sum by (route) (increase(riviera_http_server_duration_seconds_count[$__range]))",
           "legendFormat": "{{route}}",
-          "range": true
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -267,7 +273,8 @@
           },
           "expr": "sum by (job_name, outcome) (rate(riviera_jobs_runs_total[$__rate_interval]))",
           "legendFormat": "{{job_name}} {{outcome}}",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -314,7 +321,8 @@
           },
           "expr": "max by (job_name) (riviera_queue_depth)",
           "legendFormat": "{{job_name}}",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -361,7 +369,8 @@
           },
           "expr": "sum by (job_name) (increase(riviera_jobs_failures_total[$__range]))",
           "legendFormat": "{{job_name}}",
-          "range": true
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
@@ -407,7 +416,8 @@
           },
           "expr": "histogram_quantile(0.95, sum by (job_name, le) (rate(riviera_jobs_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "{{job_name}} p95",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -465,7 +475,8 @@
           },
           "expr": "sum by (service, outcome) (rate(riviera_external_calls_total[$__rate_interval]))",
           "legendFormat": "{{service}} {{outcome}}",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -512,7 +523,8 @@
           },
           "expr": "histogram_quantile(0.95, sum by (service, operation, le) (rate(riviera_external_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "{{service}} {{operation}} p95",
-          "range": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {

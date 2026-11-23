@@ -205,7 +205,9 @@ function queryPanel(spec: QuerySpec, id: number, gridPos: GridPos): Panel {
       datasource: PROMETHEUS,
       expr: query.expr,
       legendFormat: query.legend,
-      range: true,
+      // A stat shows one value per series, so it runs one instant query, not a range of them.
+      range: spec.kind === "timeseries",
+      instant: spec.kind === "stat",
     })),
     fieldConfig: { defaults: { unit: spec.unit, noValue: NO_DATA, min: 0 }, overrides: [] },
     options: spec.kind === "stat" ? STAT_OPTIONS : TIMESERIES_OPTIONS,
