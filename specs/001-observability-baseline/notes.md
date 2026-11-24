@@ -25,3 +25,13 @@ description of the task it names, and that PR either acts on it or says why not.
   built derived images (`riviera-dig/otel-collector:local`, `riviera-dig/loki:local`,
   `riviera-dig/tempo:local`). The Trivy step must scan them after the build, not try to pull
   them, so the upstream images inside them (and the copied busybox) are covered.
+
+## T024 (from the 001 follow-ups, PR #45)
+
+- `proxy/nginx.conf` now resolves `api` and `web` through Docker's DNS (`resolver 127.0.0.11
+  valid=2s`). Before, a recreated api that came back on a new IP got 502s through the proxy
+  until the proxy restarted, which the plain-stack → `--profile dev --profile observability` up
+  sequence of the stack job triggers. Only static tests (`apps/api/test/proxy-config.test.ts`)
+  cover it; the stack job's second smoke through the proxy, after that up, is its end-to-end
+  check, so keep that smoke step after the profile switch. `ci/smoke.ts` does not retry: if it
+  runs within ~2 s of the api changing IP it can still see one 502.
