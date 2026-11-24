@@ -33,7 +33,7 @@ Grafana is at http://127.0.0.1:3300 (`GRAFANA_PORT` in `.env`), with one dashboa
 and a service overview. All ports bind to 127.0.0.1 only.
 
 If the collector is down, requests and jobs carry on and telemetry is dropped, with at most
-one `telemetry export failed` warning per minute in the logs.
+one `telemetry export failed; dropping data` warning per minute in the logs.
 
 The walkthrough, with what to expect at each step, is
 [`specs/001-observability-baseline/quickstart.md`](specs/001-observability-baseline/quickstart.md).

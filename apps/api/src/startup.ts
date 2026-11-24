@@ -1,6 +1,12 @@
 import { createInstruments } from "@riviera/telemetry/instruments";
 import type { DropWarning } from "@riviera/telemetry/export-guard";
-import { startTelemetry, type Exporters, type Telemetry } from "@riviera/telemetry/sdk";
+import {
+  startTelemetry,
+  STARTUP_FLUSH_TIMEOUT_MS,
+  within,
+  type Exporters,
+  type Telemetry,
+} from "@riviera/telemetry/sdk";
 import type { FastifyInstance } from "fastify";
 import pkg from "../package.json" with { type: "json" };
 import { buildApp } from "./app.ts";
@@ -163,7 +169,8 @@ export async function startService(
     }
 
     instruments.zeroInitialise();
-    await telemetry.forceFlush();
+    // Bounded, so an unreachable collector can't hold `listen` (001/FR-020); the flush carries on.
+    await within(telemetry.forceFlush(), STARTUP_FLUSH_TIMEOUT_MS);
     giveUpIfSignalled();
     await app.listen({ host: "0.0.0.0", port: config.port });
     giveUpIfSignalled();

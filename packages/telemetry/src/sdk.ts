@@ -78,6 +78,26 @@ export const SPAN_EXPORT_DELAY_MS = 1000;
 export const EXPORT_QUEUE_SIZE = 2048;
 export const METRIC_EXPORT_INTERVAL_MS = 5000;
 export const SHUTDOWN_TIMEOUT_MS = 2000;
+/**
+ * How long startup waits for the flush of the zero counters (research R18) before it listens
+ * anyway. A running collector answers in milliseconds; an unreachable one would otherwise hold
+ * startup for the exporter's retries and timeout, 8-10 s (001/FR-020).
+ */
+export const STARTUP_FLUSH_TIMEOUT_MS = 1000;
+
+/** Settles with `work`, or resolves after `ms` if `work` is still pending; the timer never keeps the process alive. */
+export async function within(work: Promise<void>, ms: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, ms);
+    timer.unref();
+  });
+  try {
+    await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // A loop rather than /\/+$/, which backtracks quadratically on a long run of slashes.
 function withoutTrailingSlashes(text: string): string {
@@ -166,13 +186,7 @@ export function startTelemetry(options: TelemetryOptions): Telemetry {
     ]);
   };
   const shutdown = async (): Promise<void> => {
-    let timer: NodeJS.Timeout | undefined;
-    const timeout = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, SHUTDOWN_TIMEOUT_MS);
-      timer.unref();
-    });
-    await Promise.race([stop(), timeout]);
-    clearTimeout(timer);
+    await within(stop(), SHUTDOWN_TIMEOUT_MS);
     trace.disable();
     metrics.disable();
     logs.disable();
