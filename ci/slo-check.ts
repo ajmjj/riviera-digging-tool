@@ -1,8 +1,10 @@
 // SLO metric check (constitution, Principle VII): every metric in ci/slo-catalog.json must
-// be registered in the telemetry package. The registry arrives with 001 (observability
-// baseline); until it exists this check validates the catalog and passes trivially.
-// 001 also adds the export test: each registered instrument reaches an in-memory OTLP
-// exporter.
+// be registered in the telemetry package's registry (packages/telemetry/src/slo-metrics.ts,
+// since 001). The export half lives elsewhere: packages/telemetry/test/instruments.test.ts
+// shows each registered instrument reaching an in-memory OTLP exporter (001/FR-014), and the
+// CI `stack` job's `node ci/obs-check.ts` sends a sample for every SLO metric through the real
+// collector and reads it back on its Grafana dashboard (001/FR-033). If the registry file is
+// ever missing, this check only validates the catalog.
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { missingMetrics, parseCatalog, requiredMetrics } from "./lib/slo.ts";

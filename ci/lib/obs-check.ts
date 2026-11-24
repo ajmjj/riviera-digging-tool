@@ -245,7 +245,7 @@ interface PanelQuery {
   readonly expr: string;
   readonly instant: boolean;
   readonly stat: boolean;
-  /** The target's datasource, else its panel's, as the dashboard JSON gives it. */
+  /** The target's datasource, else its panel's, else the provisioned Prometheus one. */
   readonly datasource: unknown;
 }
 
@@ -262,6 +262,9 @@ async function checkSearch(urls: ObsUrls, deps: ObsDeps, sloIds: readonly string
   }
 }
 
+/** The provisioned Prometheus datasource, for panels that inherit the dashboard default. */
+const DEFAULT_DATASOURCE = { type: "prometheus", uid: "prometheus" };
+
 /** Every Prometheus query of a dashboard except constant targets such as `vector(0.999)`. */
 async function panelQueries(urls: ObsUrls, deps: ObsDeps, uid: string): Promise<PanelQuery[]> {
   const body = await getJson(deps, `${urls.grafana}/api/dashboards/uid/${uid}`);
@@ -274,7 +277,7 @@ async function panelQueries(urls: ObsUrls, deps: ObsDeps, uid: string): Promise<
         expr: str(at(t, "expr")),
         instant: at(t, "instant") === true,
         stat: at(panel, "type") === "stat",
-        datasource: at(t, "datasource") ?? at(panel, "datasource"),
+        datasource: at(t, "datasource") ?? at(panel, "datasource") ?? DEFAULT_DATASOURCE,
       })),
     )
     .filter((q) => !/^vector\([\d.]+\)$/.test(q.expr));

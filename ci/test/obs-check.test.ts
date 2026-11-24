@@ -223,6 +223,8 @@ describe("obs-check (001/FR-033)", () => {
     await run();
     expect(w.dsQueries).toContainEqual({ expr: "hidden", uid: "prom-panel" });
     expect(w.dsQueries).toContainEqual({ expr: "sli", uid: "prom-target" });
+    // The graph names no datasource on its target or panel: the provisioned one is used.
+    expect(w.dsQueries).toContainEqual({ expr: "sli", uid: "prometheus" });
     expect(w.dsQueries.some((q) => q.expr.startsWith("vector("))).toBe(false);
   });
 
