@@ -1,5 +1,5 @@
 import { createDropWarning, type DropWarning } from "@riviera/telemetry/export-guard";
-import { SHUTDOWN_TIMEOUT_MS } from "@riviera/telemetry/sdk";
+import { SHUTDOWN_TIMEOUT_MS, STARTUP_FLUSH_TIMEOUT_MS } from "@riviera/telemetry/sdk";
 import { EventEmitter } from "node:events";
 import { createServer as createHttpServer, type IncomingMessage } from "node:http";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
@@ -29,10 +29,10 @@ const mocks: typeof fetch = (input, init) => {
 };
 const accepted = z.object({ jobId: z.uuid() });
 const REQUESTS = 200;
-// Starting with the collector down takes several seconds: the startup flush of the zero
-// counters (research R18) waits for the OTLP exporter's retries. Requests are not affected.
-const SLOW = { timeout: 60_000 };
 const WAIT = { timeout: 15_000 };
+// Startup waits for the zero-counter flush (research R18) at most STARTUP_FLUSH_TIMEOUT_MS, so a
+// collector that is down or silent can't hold `listen` (001/FR-020); migrations take the rest.
+const STARTUP_BOUND_MS = STARTUP_FLUSH_TIMEOUT_MS + 2000;
 
 let db: FreshDatabase;
 let services: Service[];
@@ -87,11 +87,12 @@ async function silentCollector() {
   return { endpoint: new URL(`http://127.0.0.1:${String(port)}`), received };
 }
 
+/** Starts a service and records how long `startService` took. */
 async function start(
   role: ServiceConfig["role"],
   endpoint: URL | undefined,
   dropWarning?: DropWarning,
-): Promise<Service> {
+): Promise<Service & { readonly startMs: number }> {
   const config: ServiceConfig = {
     role,
     port: 0,
@@ -101,13 +102,21 @@ async function start(
     telemetry: { environment: "ci", endpoint },
     sampleFlows: ON,
   };
+  const started = performance.now();
   const service = await startService(config, new EventEmitter(), {
     fetch: mocks,
     idleMs: 5,
     ...(dropWarning === undefined ? {} : { dropWarning }),
   });
+  const startMs = performance.now() - started;
   services.push(service);
-  return service;
+  return { ...service, startMs };
+}
+
+/** Stops a service the test itself stops, so `afterEach` doesn't stop it a second time. */
+async function stopNow(service: Service): Promise<void> {
+  services = services.filter((s) => s.app !== service.app);
+  await service.stop();
 }
 
 /** Sends one sample request; returns its status, the job ID and how long it took. */
@@ -138,70 +147,65 @@ function clockedWarning() {
 }
 
 describe("001/FR-020: telemetry export never blocks or fails requests and jobs", () => {
-  it(
-    "001/FR-020: with the collector down, 200 sample requests and their jobs all succeed",
-    SLOW,
-    async () => {
-      const endpoint = new URL(`http://127.0.0.1:${String(await closedPort())}`);
-      const { clock, lines, limiter } = clockedWarning();
+  it("001/FR-020: with the collector down, startup is bounded and 200 sample requests and their jobs all succeed", async () => {
+    const endpoint = new URL(`http://127.0.0.1:${String(await closedPort())}`);
+    const { clock, lines, limiter } = clockedWarning();
 
-      const api = await start("api", endpoint, limiter);
-      const results = [];
-      for (let i = 0; i < REQUESTS; i += 1) results.push(await sample(api));
-      expect(results.map((r) => r.status)).toEqual(Array<number>(REQUESTS).fill(202));
-      await start("worker", endpoint, limiter);
-      await vi.waitFor(async () => {
-        const { rows } = await db.query("SELECT status, count(*)::int AS n FROM job GROUP BY 1");
-        expect(rows).toEqual([{ status: "succeeded", n: REQUESTS }]);
-      }, WAIT);
+    const api = await start("api", endpoint, limiter);
+    expect(api.startMs).toBeLessThan(STARTUP_BOUND_MS);
+    const results = [];
+    for (let i = 0; i < REQUESTS; i += 1) results.push(await sample(api));
+    expect(results.map((r) => r.status)).toEqual(Array<number>(REQUESTS).fill(202));
+    const worker = await start("worker", endpoint, limiter);
+    expect(worker.startMs).toBeLessThan(STARTUP_BOUND_MS);
+    await vi.waitFor(async () => {
+      const { rows } = await db.query("SELECT status, count(*)::int AS n FROM job GROUP BY 1");
+      expect(rows).toEqual([{ status: "succeeded", n: REQUESTS }]);
+    }, WAIT);
 
-      // Many exports were dropped while the clock stood still, yet one warning was written.
-      await vi.waitFor(() => {
-        expect(clock.attempts).toBeGreaterThan(1);
-      }, WAIT);
-      expect(lines).toHaveLength(1);
-      // A minute later the next dropped export warns again, once.
-      clock.now += 60_000;
-      const seen = clock.attempts;
-      await sample(api);
-      await vi.waitFor(() => {
-        expect(clock.attempts).toBeGreaterThan(seen);
-      }, WAIT);
-      expect(lines).toHaveLength(2);
-      expect(lines.map((line) => z.object({ level: z.string() }).parse(JSON.parse(line)))).toEqual([
-        { level: "warn" },
-        { level: "warn" },
-      ]);
-    },
-  );
+    // Many exports were dropped while the clock stood still, yet one warning was written.
+    await vi.waitFor(() => {
+      expect(clock.attempts).toBeGreaterThan(1);
+    }, WAIT);
+    expect(lines).toHaveLength(1);
+    // A minute later the next dropped export warns again, once.
+    clock.now += 60_000;
+    const seen = clock.attempts;
+    await sample(api);
+    await vi.waitFor(() => {
+      expect(clock.attempts).toBeGreaterThan(seen);
+    }, WAIT);
+    expect(lines).toHaveLength(2);
+    expect(lines.map((line) => z.object({ level: z.string() }).parse(JSON.parse(line)))).toEqual([
+      { level: "warn" },
+      { level: "warn" },
+    ]);
+  });
 
-  it(
-    "001/FR-020: a collector that never answers holds neither requests nor shutdown",
-    SLOW,
-    async () => {
-      const collector = await silentCollector();
-      const { limiter } = clockedWarning();
-      const api = await start("api", collector.endpoint, limiter);
-      await sample(api);
-      // An export is now in flight and will never be answered.
-      await vi.waitFor(() => {
-        expect(collector.received).toContain("/v1/traces");
-      }, WAIT);
+  it("001/FR-020: a collector that never answers holds neither startup, requests nor shutdown", async () => {
+    const collector = await silentCollector();
+    const { limiter } = clockedWarning();
+    const api = await start("api", collector.endpoint, limiter);
+    expect(api.startMs).toBeLessThan(STARTUP_BOUND_MS);
+    await sample(api);
+    // An export is now in flight and will never be answered.
+    await vi.waitFor(() => {
+      expect(collector.received).toContain("/v1/traces");
+    }, WAIT);
 
-      const results = [];
-      for (let i = 0; i < 50; i += 1) results.push(await sample(api));
-      expect(results.every((r) => r.status === 202)).toBe(true);
-      // Each request is served long before any export could time out.
-      expect(Math.max(...results.map((r) => r.ms))).toBeLessThan(SHUTDOWN_TIMEOUT_MS / 2);
+    const results = [];
+    for (let i = 0; i < 50; i += 1) results.push(await sample(api));
+    expect(results.every((r) => r.status === 202)).toBe(true);
+    // Each request is served long before any export could time out.
+    expect(Math.max(...results.map((r) => r.ms))).toBeLessThan(SHUTDOWN_TIMEOUT_MS / 2);
 
-      // Shutdown waits for the hanging exports only until its timeout, and never rejects.
-      const started = performance.now();
-      await expect(api.stop()).resolves.toBeUndefined();
-      const elapsed = performance.now() - started;
-      expect(elapsed).toBeGreaterThanOrEqual(SHUTDOWN_TIMEOUT_MS - 50);
-      expect(elapsed).toBeLessThan(SHUTDOWN_TIMEOUT_MS + 1000);
-    },
-  );
+    // Shutdown waits for the hanging exports only until its timeout, and never rejects.
+    const started = performance.now();
+    await expect(stopNow(api)).resolves.toBeUndefined();
+    const elapsed = performance.now() - started;
+    expect(elapsed).toBeGreaterThanOrEqual(SHUTDOWN_TIMEOUT_MS - 50);
+    expect(elapsed).toBeLessThan(SHUTDOWN_TIMEOUT_MS + 1000);
+  });
 });
 
 describe("001/FR-019: without an endpoint", () => {
@@ -211,7 +215,7 @@ describe("001/FR-019: without an endpoint", () => {
     const { clock, limiter } = clockedWarning();
     const api = await start("api", undefined, limiter);
     expect((await sample(api)).status).toBe(202);
-    await api.stop();
+    await stopNow(api);
 
     const line = z.object({ time: z.string(), level: z.string(), msg: z.string() });
     const lines = stdout.map((text) => line.parse(JSON.parse(text)));

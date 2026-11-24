@@ -8,10 +8,16 @@ import {
   TraceFlags,
   trace,
 } from "@opentelemetry/api";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDropWarning } from "../src/export-guard.ts";
 import { createInstruments } from "../src/instruments.ts";
-import { otlpExporters, SHUTDOWN_TIMEOUT_MS, startTelemetry, type Exporters } from "../src/sdk.ts";
+import {
+  otlpExporters,
+  SHUTDOWN_TIMEOUT_MS,
+  startTelemetry,
+  within,
+  type Exporters,
+} from "../src/sdk.ts";
 import { INSTRUMENTS } from "../src/slo-metrics.ts";
 import { startTestTelemetry, type TestTelemetry } from "../src/testing.ts";
 
@@ -148,6 +154,30 @@ describe("startTelemetry", () => {
     const started = Date.now();
     await telemetry.shutdown();
     expect(Date.now() - started).toBeLessThan(SHUTDOWN_TIMEOUT_MS + 500);
+  });
+
+  it("001/FR-020: within() stops waiting for pending work after its bound", async () => {
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const waiting = within(new Promise<void>(() => undefined), 1000).then(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await waiting;
+      expect(settled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("001/FR-020: within() settles as soon as the work does, rejections included", async () => {
+    await expect(within(Promise.resolve(), 60_000)).resolves.toBeUndefined();
+    await expect(within(Promise.reject(new Error("flush failed")), 60_000)).rejects.toThrow(
+      "flush failed",
+    );
   });
 
   it("001/FR-019: the test harness receives spans, metrics and logs", async () => {
