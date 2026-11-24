@@ -176,6 +176,8 @@ describe("DropWarning", () => {
       msg: DROP_WARNING_MESSAGE,
       signal: "traces",
     });
+    // The text of contracts/telemetry.md ("Dropped telemetry"), literally.
+    expect(DROP_WARNING_MESSAGE).toBe("telemetry export failed; dropping data");
     expect(lines[0]).not.toContain("upstream");
     expect(lines[0]).not.toContain(secret);
   });

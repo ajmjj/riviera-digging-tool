@@ -30,7 +30,8 @@ export interface DropWarning {
 }
 
 const DROP_WARNING_INTERVAL_MS = 60_000;
-export const DROP_WARNING_MESSAGE = "telemetry export failed, telemetry is being dropped";
+/** The text of contracts/telemetry.md ("Dropped telemetry"). */
+export const DROP_WARNING_MESSAGE = "telemetry export failed; dropping data";
 /** For `diag` warnings, which are not always about export (e.g. a duplicate registration). */
 export const DIAG_WARNING_MESSAGE = "OpenTelemetry SDK reported a problem";
 
