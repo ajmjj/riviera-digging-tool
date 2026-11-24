@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 // Static checks of proxy/nginx.conf. nginx resolves a literal `proxy_pass` host once, at startup,
@@ -6,7 +7,11 @@ import { describe, expect, it } from "vitest";
 // research R17) the proxy would keep the old container address and answer 502. Upstreams are
 // therefore variables, resolved through Docker's DNS. `make up` + `make smoke` prove it serves.
 
-const conf = readFileSync("proxy/nginx.conf", "utf8");
+// Resolved from this file, so the test passes whichever directory vitest starts in.
+const conf = readFileSync(
+  fileURLToPath(new URL("../../../proxy/nginx.conf", import.meta.url)),
+  "utf8",
+);
 const proxyPasses = [...conf.matchAll(/^\s*proxy_pass\s+([^;]+);/gm)].map((m) => m[1]);
 
 describe("proxy/nginx.conf", () => {
