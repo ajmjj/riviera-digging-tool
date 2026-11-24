@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   definition,
@@ -17,6 +18,11 @@ import { OVERVIEW_FILE, overviewDashboard } from "../src/dashboards/overview.ts"
 import { INSTRUMENTS, type InstrumentDef } from "../src/slo-metrics.ts";
 
 const registry: readonly InstrumentDef[] = INSTRUMENTS;
+
+/** A repository file, resolved from this test file rather than the working directory. */
+function repoFile(path: string): string {
+  return readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), "utf8");
+}
 const overview = overviewDashboard();
 const queryPanels = overview.panels.filter((panel) => panel.type !== "row");
 const exprs = queryPanels.flatMap((panel) => (panel.targets ?? []).map((target) => target.expr));
@@ -34,7 +40,17 @@ function exprsOf(title: string): string[] {
 }
 
 // PromQL words the overview may use besides metric and label names.
-const PROMQL_WORDS = new Set(["sum", "max", "by", "rate", "increase", "histogram_quantile", "le"]);
+const PROMQL_WORDS = new Set([
+  "sum",
+  "max",
+  "by",
+  "rate",
+  "increase",
+  "histogram_quantile",
+  "le",
+  "and",
+  "on",
+]);
 const LABEL_NAMES = new Set(registry.flatMap((def) => Object.keys(def.labels)));
 
 /** Identifiers in a PromQL expression, outside string literals and Grafana `$__` variables. */
@@ -45,14 +61,12 @@ function identifiers(expr: string): string[] {
 
 describe("OTel → Prometheus name translation (research R7)", () => {
   it("001/FR-026: matches every Prometheus name in contracts/telemetry.md#metrics", () => {
-    const contract = readFileSync(
-      "specs/001-observability-baseline/contracts/telemetry.md",
-      "utf8",
-    );
+    const contract = repoFile("specs/001-observability-baseline/contracts/telemetry.md");
     const rows = [
       ...contract.matchAll(/^\| `(riviera\.[a-z_.]+)` \|.*\| `(riviera_[a-z_]+\*?)` \|$/gm),
     ];
-    expect(rows.length).toBe(7);
+    // The minimum and service metrics table lists every instrument that feeds no SLO.
+    expect(rows.length).toBe(registry.filter((def) => def.slo === undefined).length);
     for (const [, otel = "", prom = ""] of rows) {
       const def = definition(otel);
       const expected = def.kind === "histogram" ? `${prometheusName(def)}_*` : prometheusName(def);
@@ -144,11 +158,12 @@ describe("service overview dashboard", () => {
       'sum by (route) (rate(riviera_http_server_duration_seconds_count{status_class="5xx"}[$__rate_interval]))',
       'sum by (route) (rate(riviera_http_server_duration_seconds_count{status_class="4xx"}[$__rate_interval]))',
     ]);
-    for (const expr of exprsOf("Latency by route")) {
-      expect(expr).toMatch(
-        /^histogram_quantile\(0\.\d+, sum by \(route, le\) \(rate\(riviera_http_server_duration_seconds_bucket\[\$__rate_interval\]\)\)\)$/,
-      );
-    }
+    expect(exprsOf("Latency by route")).toEqual(
+      [0.5, 0.95].map(
+        (q) =>
+          `histogram_quantile(${String(q)}, sum by (route, le) (rate(riviera_http_server_duration_seconds_bucket[$__rate_interval]))) and on(route) (sum by (route) (rate(riviera_http_server_duration_seconds_count[$__rate_interval])) > 0)`,
+      ),
+    );
 
     // Job runs, failures and queue depth.
     expect(exprsOf("Job runs by outcome")).toEqual([
@@ -189,12 +204,15 @@ describe("service overview dashboard", () => {
     );
     for (const expr of exprs) {
       const metrics = identifiers(expr).filter((word) => defs.has(word));
-      expect(metrics.length, expr).toBe(1);
+      // One instrument per query; a quantile's no-traffic guard reads the same histogram's _count.
+      expect(metrics.length, expr).toBeGreaterThan(0);
+      expect(new Set(metrics.map((metric) => defs.get(metric))).size, expr).toBe(1);
       const [metric = ""] = metrics;
       const labels = defs.get(metric)?.labels ?? {};
       const known = (key: string): boolean =>
-        Object.hasOwn(labels, key) || (key === "le" && metric.endsWith("_bucket"));
-      for (const [, list = ""] of expr.matchAll(/\bby \(([^)]*)\)/g)) {
+        Object.hasOwn(labels, key) ||
+        (key === "le" && metrics.some((name) => name.endsWith("_bucket")));
+      for (const [, list = ""] of expr.matchAll(/\b(?:by |on)\(([^)]*)\)/g)) {
         for (const key of list.split(", ")) {
           expect(known(key), `${key} in ${expr}`).toBe(true);
         }
@@ -206,6 +224,21 @@ describe("service overview dashboard", () => {
           `${key}="${value}" in ${expr}`,
         ).toBe(true);
       }
+    }
+  });
+
+  it("001/FR-026: every quantile shows no value, not NaN, for a group with no traffic", () => {
+    const quantiles = exprs.filter((expr) => expr.startsWith("histogram_quantile("));
+    expect(quantiles.length).toBe(4);
+    for (const expr of quantiles) {
+      const match =
+        /^histogram_quantile\(0\.\d+, sum by \(([^)]*), le\) \(rate\((\w+)_bucket\[\$__rate_interval\]\)\)\) and on\(([^)]*)\) \(sum by \(([^)]*)\) \(rate\((\w+)_count\[\$__rate_interval\]\)\) > 0\)$/.exec(
+          expr,
+        );
+      expect(match, expr).not.toBeNull();
+      const [, by, bucket, on, countBy, count] = match ?? [];
+      expect([on, countBy], expr).toEqual([by, by]);
+      expect(count, expr).toBe(bucket);
     }
   });
 
@@ -228,7 +261,7 @@ describe("service overview dashboard", () => {
 
   it("001/FR-026: the committed JSON equals the generator output (run `make dashboards`)", () => {
     const committed: unknown = JSON.parse(
-      readFileSync(`observability/grafana/dashboards/${OVERVIEW_FILE}`, "utf8"),
+      repoFile(`observability/grafana/dashboards/${OVERVIEW_FILE}`),
     );
     expect(committed).toEqual(JSON.parse(JSON.stringify(overview)));
   });

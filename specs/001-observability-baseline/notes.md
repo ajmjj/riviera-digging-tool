@@ -9,12 +9,6 @@ description of the task it names, and that PR either acts on it or says why not.
   header allow-list and record no bodies. (T004 records no exporter error bodies; the header
   allow-list belongs to the logger's request serialiser.)
 
-## Spec follow-up (its own spec PR, not a task)
-
-- 001/FR-005 should say that secret words match whole words of a field name, plus the
-  run-together compound names (e.g. `ADMINKEY`) that T002 also matches. Research R4 already
-  assumes the whole-word rule.
-
 ## T016 (from T013)
 
 - The Common Ground mock answers 401 without `Authorization`, and T013's client sends the header

@@ -57,12 +57,14 @@ export interface TelemetryPluginOptions {
  * routes are added and become the closed `route` label set when the app is ready, so a 404 flood
  * adds one `unmatched` series, never one per raw path. A route the hook never saw (registered
  * earlier, or in a sibling scope) is counted as `unmatched` too, rather than rejected; its span
- * still carries the real template.
+ * still carries the real template, so its first request logs one warning per template to make
+ * the mismatch between trace and metric visible.
  */
 export function registerTelemetry(app: FastifyInstance, options: TelemetryPluginOptions): void {
   const routes = new Set<string>();
   const active = new WeakMap<FastifyRequest, Span>();
   const errors = new WeakMap<FastifyRequest, Error>();
+  const warned = new Set<string>();
   let instruments: Instruments | undefined;
 
   app.addHook("onRoute", (route) => {
@@ -135,8 +137,16 @@ export function registerTelemetry(app: FastifyInstance, options: TelemetryPlugin
     span.end();
 
     const route = request.routeOptions.url;
+    const known = route !== undefined && routes.has(route);
+    if (route !== undefined && !known && !warned.has(route)) {
+      warned.add(route);
+      request.log.warn(
+        { route },
+        "route registered before the telemetry plugin; its requests are counted as unmatched",
+      );
+    }
     instruments?.record("riviera.http.server.duration", reply.elapsedTime / 1000, {
-      route: route !== undefined && routes.has(route) ? route : UNMATCHED_ROUTE,
+      route: known ? route : UNMATCHED_ROUTE,
       method: methodLabel(request.method),
       status_class: statusClass(code),
     });
