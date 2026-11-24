@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   POLL_TIMEOUT_MS,
@@ -5,12 +6,26 @@ import {
   runObsCheck,
   type ObsUrls,
 } from "../lib/obs-check.ts";
+import { parseCatalog } from "../lib/slo.ts";
+
+function sloIds(): string[] {
+  const raw: unknown = JSON.parse(
+    readFileSync(new URL("../slo-catalog.json", import.meta.url), "utf8"),
+  );
+  const catalog = parseCatalog(raw);
+  if (Array.isArray(catalog)) {
+    throw new Error(`ci/slo-catalog.json is invalid: ${catalog.join("; ")}`);
+  }
+  return catalog.slos.map((s) => s.id);
+}
+const SLO_IDS = sloIds();
 
 const urls: ObsUrls = {
   api: "http://api",
   tempo: "http://tempo",
   loki: "http://loki",
   prometheus: "http://prom",
+  grafana: "http://grafana",
 };
 const REQ = ["0af7651916cd43dd8448eb211c80319c", "1af7651916cd43dd8448eb211c80319c"];
 const JOB_TRACE = ["00f067aa0ba902b7a1b2c3d4e5f60718", "00e067aa0ba902b7a1b2c3d4e5f60718"];
@@ -34,9 +49,16 @@ interface World {
   jobErrors: boolean[];
   discogsSpan: boolean;
   logLines: number;
-  metricValue: string;
+  /** Counter values before and after the sample requests; undefined = no series yet. */
+  metricBefore: string | undefined;
+  metricAfter: string;
+  queueExported: boolean;
   requestIds: string[];
   unsignalled: number;
+  sloFolder: string[];
+  overview: boolean;
+  dataBeforeSamples: boolean;
+  queryError: string | undefined;
 }
 
 /** A stack where everything arrives; tests break one part at a time. */
@@ -53,17 +75,26 @@ function world() {
     jobErrors: [false, true],
     discogsSpan: true,
     logLines: 1,
-    metricValue: "1",
+    metricBefore: undefined,
+    metricAfter: "2",
+    queueExported: true,
     requestIds: [],
     unsignalled: 0,
+    sloFolder: SLO_IDS.map((id) => `slo-${id}`),
+    overview: true,
+    dataBeforeSamples: false,
+    queryError: undefined,
   };
   const json = (body: unknown, status = 200) => Promise.resolve(Response.json(body, { status }));
   const fetchFn = (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(input instanceof Request ? input.url : input);
     const path = url.pathname;
     w.unsignalled += init?.signal instanceof AbortSignal ? 0 : 1;
+    const body: unknown = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+    if (url.host === "grafana") {
+      return grafana(path);
+    }
     if (url.host === "api") {
-      const body: unknown = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
       w.requestIds.push(new Headers(init?.headers).get("x-request-id") ?? "");
       const i = Reflect.get(Object(body), "failJob") === true ? 1 : 0;
       return json(w.sampleBody(i), w.sampleStatus);
@@ -94,7 +125,32 @@ function world() {
       const values = Array.from({ length: w.logLines }, () => ["1", "{}"]);
       return json({ data: { result: [{ values }] } });
     }
-    return json({ data: { result: [{ value: [1, w.metricValue] }] } });
+    const query = url.searchParams.get("query") ?? "";
+    if (query.includes("riviera_queue_depth")) {
+      return json({ data: { result: w.queueExported ? [{ value: [1, "1"] }] : [] } });
+    }
+    const value = w.requestIds.length > 0 ? w.metricAfter : w.metricBefore;
+    return json({ data: { result: value === undefined ? [] : [{ value: [1, value] }] } });
+  };
+  const grafana = (path: string): Promise<Response> => {
+    if (path === "/api/search") {
+      const slos = w.sloFolder.map((uid) => ({ uid, folderTitle: "SLOs" }));
+      const overview = w.overview ? [{ uid: "service-overview", folderTitle: "Service" }] : [];
+      return json([...slos, ...overview]);
+    }
+    if (path.startsWith("/api/dashboards/uid/")) {
+      const stat = (title: string, expr: string) => ({
+        type: "stat",
+        title,
+        targets: [{ expr, instant: true }],
+      });
+      const graph = { type: "timeseries", title: "graph", targets: [{ expr: "sli" }] };
+      const panels = [{ type: "row" }, stat("Target", "vector(0.99)"), stat("SLI", "sli"), graph];
+      return json({ dashboard: { panels } });
+    }
+    const frame = { data: { values: [[1], [w.dataBeforeSamples ? 0.5 : null]] } };
+    const error = w.queryError === undefined ? {} : { error: w.queryError };
+    return json({ results: { A: { frames: [frame], ...error } } });
   };
   const lines: string[] = [];
   const deps = {
@@ -108,15 +164,22 @@ function world() {
       lines.push(line);
     },
   };
-  const run = async () => ({ ok: await runObsCheck(urls, deps), lines });
+  const run = async () => ({
+    ok: await runObsCheck(urls, deps, SLO_IDS),
+    lines,
+  });
   return { w, run };
 }
 
 describe("obs-check (001/FR-033)", () => {
-  it("001/FR-033: passes every step when traces, logs and metrics arrive", async () => {
+  it("001/FR-033: reads the 7 SLOs of the catalog", () => {
+    expect(SLO_IDS).toHaveLength(7);
+  });
+
+  it("001/FR-033: passes every step when traces, logs, metrics and dashboards arrive", async () => {
     const { w, run } = world();
     const { ok, lines } = await run();
-    expect(lines).toHaveLength(3);
+    expect(lines).toHaveLength(5);
     expect(lines.every((l) => l.startsWith("PASS"))).toBe(true);
     expect(ok).toBe(true);
     expect(w.requestIds).toHaveLength(2);
@@ -144,7 +207,13 @@ describe("obs-check (001/FR-033)", () => {
     ["an ok job marked as error", (w) => (w.jobErrors = [true, true]), "error status is true"],
     ["a failed job not marked", (w) => (w.jobErrors = [false, false]), "error status is false"],
     ["no log lines", (w) => (w.logLines = 0), "no line matches"],
-    ["a metric still at 0", (w) => (w.metricValue = "0"), "no value above 0 yet"],
+    ["a counter that did not rise", (w) => (w.metricBefore = "2"), "not above 2, its value before"],
+    ["no queue-depth series", (w) => (w.queueExported = false), "not exported yet"],
+    ["a missing SLO dashboard", (w) => w.sloFolder.pop(), 'folder "SLOs" holds'],
+    ["an extra SLO dashboard", (w) => w.sloFolder.push("slo-extra"), "expected exactly"],
+    ["no overview dashboard", (w) => (w.overview = false), "uid service-overview"],
+    ["data before samples", (w) => (w.dataBeforeSamples = true), "needs fresh volumes"],
+    ["a failing Grafana query", (w) => (w.queryError = "bad expr"), "Grafana query for"],
   ])("001/FR-033: fails with a clear message on %s", async (_, breakIt, message) => {
     const { w, run } = world();
     breakIt(w);
