@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./export-guard": "./src/export-guard.ts",
     "./instruments": "./src/instruments.ts",
     "./logger": "./src/logger.ts",
     "./redact": "./src/redact.ts",

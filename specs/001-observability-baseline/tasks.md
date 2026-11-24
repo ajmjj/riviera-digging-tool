@@ -139,7 +139,7 @@ empty, then filled).
 
 **Independent test**: quickstart.md §7; automated by T022 and, against the stack, T024.
 
-- [ ] T022 [US5] Resilience tests `apps/api/test/integration/telemetry-resilience.int.test.ts`: real OTLP exporters pointed at a closed 127.0.0.1 port; 200 sample requests and jobs all succeed, request latency is not held by export, at most one drop warning per minute (fake clock), shutdown completes within its timeout; with no endpoint, JSON logs still go to stdout and no exporter is created. Add a "Observability" section to `README.md` linking quickstart.md. Depends on T016, T018. **FR-019, FR-020** · ~220 lines
+- [X] T022 [US5] Resilience tests `apps/api/test/integration/telemetry-resilience.int.test.ts`: real OTLP exporters pointed at a closed 127.0.0.1 port; 200 sample requests and jobs all succeed, request latency is not held by export, at most one drop warning per minute (fake clock), shutdown completes within its timeout; with no endpoint, JSON logs still go to stdout and no exporter is created. Add a "Observability" section to `README.md` linking quickstart.md. Depends on T016, T018. **FR-019, FR-020** · ~220 lines
 
 ---
 

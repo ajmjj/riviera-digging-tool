@@ -1,4 +1,5 @@
 import { createInstruments } from "@riviera/telemetry/instruments";
+import type { DropWarning } from "@riviera/telemetry/export-guard";
 import { startTelemetry, type Exporters, type Telemetry } from "@riviera/telemetry/sdk";
 import type { FastifyInstance } from "fastify";
 import pkg from "../package.json" with { type: "json" };
@@ -28,6 +29,8 @@ export interface StartOptions {
   readonly migrationsDir?: URL;
   /** Exporters besides OTLP, e.g. in-memory ones in tests. */
   readonly exporters?: readonly Exporters[];
+  /** The limiter for dropped telemetry; tests inject one with a fake clock (001/FR-020). */
+  readonly dropWarning?: DropWarning;
   /** The outbound client's fetch; tests pass a fake of the mocks. */
   readonly fetch?: typeof fetch;
   /** The worker's idle wait between empty claims; default 500 ms. */
@@ -115,6 +118,7 @@ export async function startService(
       environment,
       endpoint: config.telemetry.endpoint?.href,
       exporters: options.exporters ?? [],
+      ...(options.dropWarning === undefined ? {} : { dropWarning: options.dropWarning }),
     });
     const meter = telemetry.meterProvider.getMeter("@riviera/api");
     // No routes: only the telemetry plugin records the route-labelled histogram.
