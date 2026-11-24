@@ -1,7 +1,6 @@
 // End-to-end observability check against the running stack (001/FR-033, research R14). Each step
 // asks the stack's own query interfaces (Tempo, Loki, Prometheus, Grafana) and fails with a
-// message that says what was missing. The CLI is ci/obs-check.ts. The SLO samples and the panel
-// values they produce (R14 step 4) are the last T023 PR.
+// message that says what was missing. The CLI is ci/obs-check.ts.
 
 export interface ObsUrls {
   readonly api: string;
@@ -9,6 +8,7 @@ export interface ObsUrls {
   readonly loki: string;
   readonly prometheus: string;
   readonly grafana: string;
+  readonly otlp: string;
 }
 
 export interface ObsDeps {
@@ -23,7 +23,26 @@ export const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 /** Per request, so a service that accepts the connection but never answers can't hang the check. */
 export const REQUEST_TIMEOUT_MS = 10_000;
+/** The api's metric export interval (METRIC_EXPORT_INTERVAL_MS in packages/telemetry/src/sdk.ts). */
+export const EXPORT_INTERVAL_MS = 5_000;
+/**
+ * Sample points are stamped this far in the past: the freshness SLI is a `[28d:5m]` subquery,
+ * whose steps sit on 5-minute boundaries and look back 5 minutes, so a point newer than the last
+ * boundary would show nothing until the next one. Prometheus accepts it (30 m out-of-order window).
+ */
+const SAMPLE_BACKDATE_MS = 6 * 60_000;
+const SAMPLE_SERVICE = "riviera-slo-sample";
 const JOB = "sample.discogs_release";
+
+/** The subset of a registry instrument (packages/telemetry/src/slo-metrics.ts) samples need. */
+export interface SampleInstrument {
+  readonly name: string;
+  readonly kind: "counter" | "histogram" | "gauge";
+  readonly unit: string;
+  readonly labels: Readonly<Record<string, readonly string[] | "route">>;
+  readonly buckets?: readonly number[];
+  readonly slo?: string;
+}
 
 function fail(message: string): never {
   throw new Error(message);
@@ -226,6 +245,8 @@ interface PanelQuery {
   readonly expr: string;
   readonly instant: boolean;
   readonly stat: boolean;
+  /** The target's datasource, else its panel's, as the dashboard JSON gives it. */
+  readonly datasource: unknown;
 }
 
 async function checkSearch(urls: ObsUrls, deps: ObsDeps, sloIds: readonly string[]) {
@@ -244,13 +265,16 @@ async function checkSearch(urls: ObsUrls, deps: ObsDeps, sloIds: readonly string
 /** Every Prometheus query of a dashboard except constant targets such as `vector(0.999)`. */
 async function panelQueries(urls: ObsUrls, deps: ObsDeps, uid: string): Promise<PanelQuery[]> {
   const body = await getJson(deps, `${urls.grafana}/api/dashboards/uid/${uid}`);
-  return list(at(body, "dashboard", "panels"))
+  const top = list(at(body, "dashboard", "panels"));
+  // A collapsed row keeps its panels in `row.panels` instead of the top level.
+  return [...top, ...top.flatMap((row) => list(at(row, "panels")))]
     .flatMap((panel) =>
       list(at(panel, "targets")).map((t) => ({
         panel: str(at(panel, "title")),
         expr: str(at(t, "expr")),
         instant: at(t, "instant") === true,
         stat: at(panel, "type") === "stat",
+        datasource: at(t, "datasource") ?? at(panel, "datasource"),
       })),
     )
     .filter((q) => !/^vector\([\d.]+\)$/.test(q.expr));
@@ -260,7 +284,7 @@ async function panelQueries(urls: ObsUrls, deps: ObsDeps, uid: string): Promise<
 async function hasValue(urls: ObsUrls, deps: ObsDeps, q: PanelQuery): Promise<boolean> {
   const query = {
     refId: "A",
-    datasource: { type: "prometheus", uid: "prometheus" },
+    datasource: q.datasource,
     expr: q.expr,
     instant: q.instant,
     range: !q.instant,
@@ -291,6 +315,130 @@ async function checkNoData(urls: ObsUrls, deps: ObsDeps, sloIds: readonly string
         );
       }
     }
+  }
+}
+
+async function checkSloValues(urls: ObsUrls, deps: ObsDeps, sloIds: readonly string[]) {
+  for (const id of sloIds) {
+    for (const q of (await panelQueries(urls, deps, `slo-${id}`)).filter((p) => p.stat)) {
+      await poll(deps, `slo-${id} panel "${q.panel}"`, async () =>
+        (await hasValue(urls, deps, q)) ? undefined : "no value yet",
+      );
+    }
+  }
+}
+
+function combinations(labels: SampleInstrument["labels"]): Record<string, string>[] {
+  return Object.entries(labels).reduce<Record<string, string>[]>(
+    (acc, [key, values]) =>
+      acc.flatMap((combo) =>
+        (values === "route" ? ["unmatched"] : values).map((v) => ({ ...combo, [key]: v })),
+      ),
+    [{}],
+  );
+}
+
+interface OtlpPoint {
+  readonly attributes: readonly { key: string; value: { stringValue: string } }[];
+  readonly startTimeUnixNano: string;
+  readonly timeUnixNano: string;
+  readonly asDouble?: number;
+  readonly count?: string;
+  readonly sum?: number;
+  readonly explicitBounds?: readonly number[];
+  readonly bucketCounts?: readonly string[];
+}
+
+interface OtlpData {
+  /** 2 = cumulative. */
+  readonly aggregationTemporality?: 2;
+  readonly isMonotonic?: boolean;
+  readonly dataPoints: readonly OtlpPoint[];
+}
+
+export interface OtlpMetric {
+  readonly name: string;
+  readonly unit: string;
+  readonly sum?: OtlpData;
+  readonly gauge?: OtlpData;
+  readonly histogram?: OtlpData;
+}
+
+/** OTLP/JSON `ExportMetricsServiceRequest` with one resource and one scope. */
+export interface OtlpMetricsRequest {
+  readonly resourceMetrics: readonly {
+    readonly resource: { readonly attributes: OtlpPoint["attributes"] };
+    readonly scopeMetrics: readonly {
+      readonly scope: { readonly name: string };
+      readonly metrics: readonly OtlpMetric[];
+    }[];
+  }[];
+}
+
+/**
+ * One OTLP/JSON metrics request with point `n` (0 or 1) of every series of every SLO instrument:
+ * counters at 0 then 1, histograms one then two observations of 0 s (first bucket), gauges the time
+ * of the point (a Unix time in seconds, for `riviera.sync.last_success`).
+ */
+export function sampleRequest(
+  instruments: readonly SampleInstrument[],
+  n: 0 | 1,
+  startMs: number,
+  timeMs: number,
+): OtlpMetricsRequest {
+  const start = String((startMs - SAMPLE_BACKDATE_MS) * 1e6);
+  const time = String((timeMs - SAMPLE_BACKDATE_MS) * 1e6);
+  const metrics = instruments
+    .filter((def) => def.slo !== undefined)
+    .map((def): OtlpMetric => {
+      const points = combinations(def.labels).map((combo) => ({
+        attributes: Object.entries(combo).map(([key, v]) => ({ key, value: { stringValue: v } })),
+        startTimeUnixNano: start,
+        timeUnixNano: time,
+      }));
+      const head = { name: def.name, unit: def.unit };
+      if (def.kind === "counter") {
+        const dataPoints = points.map((p) => ({ ...p, asDouble: n }));
+        return { ...head, sum: { aggregationTemporality: 2, isMonotonic: true, dataPoints } };
+      }
+      if (def.kind === "gauge") {
+        // The Unix time of the (backdated) point itself, so the sync never "succeeds" after it.
+        const unixSeconds = Math.floor((timeMs - SAMPLE_BACKDATE_MS) / 1000);
+        const dataPoints = points.map((p) => ({ ...p, asDouble: unixSeconds }));
+        return { ...head, gauge: { dataPoints } };
+      }
+      const bounds = def.buckets ?? [];
+      const dataPoints = points.map((p) => ({
+        ...p,
+        count: String(n + 1),
+        sum: 0,
+        explicitBounds: bounds,
+        bucketCounts: [String(n + 1), ...bounds.map(() => "0")],
+      }));
+      return { ...head, histogram: { aggregationTemporality: 2, dataPoints } };
+    });
+  const resource = {
+    attributes: [{ key: "service.name", value: { stringValue: SAMPLE_SERVICE } }],
+  };
+  return {
+    resourceMetrics: [{ resource, scopeMetrics: [{ scope: { name: "obs-check" }, metrics }] }],
+  };
+}
+
+/** Research R14 step 4: two points per series, at least one export interval apart. */
+export async function emitSloSamples(
+  urls: ObsUrls,
+  deps: ObsDeps,
+  instruments: readonly SampleInstrument[],
+): Promise<void> {
+  const start = deps.now() - 1000;
+  for (const n of [0, 1] as const) {
+    if (n === 1) {
+      await deps.sleep(EXPORT_INTERVAL_MS);
+    }
+    const body = JSON.stringify(sampleRequest(instruments, n, start, deps.now()));
+    const init = { method: "POST", headers: { "content-type": "application/json" }, body };
+    await getJson(deps, `${urls.otlp}/v1/metrics`, init);
   }
 }
 
@@ -329,11 +477,12 @@ async function sendSample(urls: ObsUrls, deps: ObsDeps, flow: "ok" | "fail") {
   return result;
 }
 
-/** Runs R14 steps 1-3 and 5 in order (the SLO samples of step 4 follow); stops at the first failure. True if all pass. */
+/** Runs every step of research R14 in order; stops at the first failure. True if all pass. */
 export async function runObsCheck(
   urls: ObsUrls,
   deps: ObsDeps,
   sloIds: readonly string[],
+  instruments: readonly SampleInstrument[],
 ): Promise<boolean> {
   let current = "";
   async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
@@ -343,7 +492,7 @@ export async function runObsCheck(
     return value;
   }
   try {
-    await step("Grafana has the 7 SLO dashboards and the overview", () =>
+    await step(`Grafana has the ${String(sloIds.length)} SLO dashboards and the overview`, () =>
       checkSearch(urls, deps, sloIds),
     );
     await step("SLO panels show no data before samples", () => checkNoData(urls, deps, sloIds));
@@ -369,6 +518,10 @@ export async function runObsCheck(
     await step("http, job and external counters rise; queue depth is exported", () =>
       checkMetrics(urls, deps, baselines),
     );
+    await step("SLO samples sent; SLI and budget panels show values", async () => {
+      await emitSloSamples(urls, deps, instruments);
+      await checkSloValues(urls, deps, sloIds);
+    });
     return true;
   } catch (error) {
     deps.log(`FAIL ${current}: ${errorText(error)}`);
