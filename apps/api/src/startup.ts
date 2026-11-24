@@ -15,6 +15,7 @@ import { sampleDiscogsRelease } from "./sample/job.ts";
 
 export interface SignalSource {
   once(event: "SIGTERM" | "SIGINT", listener: () => void): unknown;
+  off(event: "SIGTERM" | "SIGINT", listener: () => void): unknown;
 }
 
 /** The loaded config. No `endpoint` turns export off (001/FR-019); no `sampleFlows`, the route. */
@@ -102,8 +103,10 @@ export async function startService(
   const giveUpIfSignalled = (): void => {
     if (signalled !== undefined) throw new Error(`startup stopped by ${signalled}`);
   };
-  signals.once("SIGTERM", onSignal("SIGTERM"));
-  signals.once("SIGINT", onSignal("SIGINT"));
+  const onTerm = onSignal("SIGTERM");
+  const onInt = onSignal("SIGINT");
+  signals.once("SIGTERM", onTerm);
+  signals.once("SIGINT", onInt);
 
   try {
     telemetry = startTelemetry({
@@ -164,6 +167,9 @@ export async function startService(
     // After listen: jobs run only once the zeros are exported and the health checks answer.
     runner?.start();
   } catch (error) {
+    // A failed start leaves nothing listening, so the caller keeps its default signal handling.
+    signals.off("SIGTERM", onTerm);
+    signals.off("SIGINT", onInt);
     await stop();
     throw error;
   }

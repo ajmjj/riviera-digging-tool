@@ -92,8 +92,11 @@ describe("001/FR-029: startup and shutdown release every resource", () => {
 
   it("001/FR-029: a failure while wiring the service shuts down the telemetry it started", async () => {
     faults.buildApp = true;
-    await expect(startService(config(), new EventEmitter())).rejects.toThrow("buildApp failed");
+    const signals = new EventEmitter();
+    await expect(startService(config(), signals)).rejects.toThrow("buildApp failed");
     expect(faults.shutdowns).toBe(1);
+    // Nothing is left listening: the caller's process keeps its default signal handling.
+    expect([signals.listenerCount("SIGTERM"), signals.listenerCount("SIGINT")]).toEqual([0, 0]);
   });
 
   it("001/FR-029: a SIGTERM during setup stops startup instead of being lost", async () => {
@@ -101,6 +104,6 @@ describe("001/FR-029: startup and shutdown release every resource", () => {
     faults.onFlush = () => signals.emit("SIGTERM");
     await expect(startService(config(), signals)).rejects.toThrow("startup stopped by SIGTERM");
     expect(faults.shutdowns).toBe(1);
-    expect(signals.listenerCount("SIGINT")).toBe(1);
+    expect([signals.listenerCount("SIGTERM"), signals.listenerCount("SIGINT")]).toEqual([0, 0]);
   });
 });
