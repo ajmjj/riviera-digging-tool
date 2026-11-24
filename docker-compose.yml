@@ -53,7 +53,8 @@ services:
       <<: *node-env
       PORT: "3000"
       # Dev-only key for the Common Ground mock (it answers 401 without one); empty means unset.
-      # Only the api calls Common Ground. `make up-dev` sets a dev value (specs/001 notes.md).
+      # Only the api calls Common Ground. `make up-dev` sets a dev value
+      # (specs/001-observability-baseline/notes.md).
       COMMON_GROUND_DEV_API_KEY: ${COMMON_GROUND_DEV_API_KEY:-}
     healthcheck:
       test:
@@ -70,6 +71,8 @@ services:
     <<: *node-service
     command: ["node", "apps/api/src/main.ts", "worker"]
     environment:
+      # The sample-flow variables of *node-env reach the worker too: with them on, it runs the
+      # sample job against the Discogs mock at DISCOGS_URL (research R17). No Common Ground key.
       <<: *node-env
       WORKER_PORT: "3001"
     healthcheck:
