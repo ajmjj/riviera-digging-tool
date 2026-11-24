@@ -67,7 +67,11 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
     `authorization`, `cookie`, `session`, `credential`, `credentials`, or if the unsplit name
     contains `password`, `secret` or `token` (catches `accesstoken`, `clientsecret`). So
     `adminKey`, `privateKey`, `accessKey` and `commonGroundAdminKey` are all redacted, while
-    `keyboard` or `monkey` are not.
+    `keyboard` or `monkey` are not. The same names written run together are caught by matching
+    these compounds inside the name with separators removed (001/FR-005): `adminkey`, `apikey`,
+    `accesskey`, `privatekey`, `secretkey`, `signingkey`, `encryptionkey`, `masterkey`,
+    `clientkey`, `sharedkey`, `sessionkey`, `sessionid`, `authkey`, `authheader`, `setcookie`,
+    `passwd`, `credential`, `authorization`.
   - Value-based: email addresses, `Bearer …`, `Discogs token=…`, `Basic …`, and URL query
     parameters named like secrets (`?token=…`, `&key=…`, `&code=…`) → `"[REDACTED]"`.
   - Request headers are never logged except an allow-list (`user-agent`, `content-type`);

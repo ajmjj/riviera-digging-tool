@@ -158,6 +158,21 @@ describe("whole-word matching of secret names (research R4)", () => {
     expect(splitWords("X-Api-Key PRIVATE_KEY")).toEqual(["x", "api", "key", "private", "key"]);
     expect(splitWords("APIKey job.name2fa")).toEqual(["api", "key", "job", "name", "2", "fa"]);
   });
+
+  it("001/FR-005: every run-together compound listed in research R4 is secret, and so is any name containing password, secret or token", () => {
+    const compounds =
+      "adminkey apikey accesskey privatekey secretkey signingkey encryptionkey masterkey " +
+      "clientkey sharedkey sessionkey sessionid authkey authheader setcookie passwd credential " +
+      "authorization";
+    for (const compound of compounds.split(" ")) {
+      for (const name of [compound, compound.toUpperCase(), `x${compound}`]) {
+        expect({ name, secret: isSecretName(name) }).toEqual({ name, secret: true });
+      }
+    }
+    for (const name of ["sessiontoken", "APISECRET", "oldpassword"]) {
+      expect({ name, secret: isSecretName(name) }).toEqual({ name, secret: true });
+    }
+  });
 });
 
 describe("redaction of free text", () => {
