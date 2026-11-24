@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { POLL_TIMEOUT_MS, runObsCheck, type ObsUrls } from "../lib/obs-check.ts";
+import {
+  POLL_TIMEOUT_MS,
+  REQUEST_TIMEOUT_MS,
+  runObsCheck,
+  type ObsUrls,
+} from "../lib/obs-check.ts";
 
 const urls: ObsUrls = {
   api: "http://api",
@@ -31,6 +36,7 @@ interface World {
   logLines: number;
   metricValue: string;
   requestIds: string[];
+  unsignalled: number;
 }
 
 /** A stack where everything arrives; tests break one part at a time. */
@@ -49,11 +55,13 @@ function world() {
     logLines: 1,
     metricValue: "1",
     requestIds: [],
+    unsignalled: 0,
   };
   const json = (body: unknown, status = 200) => Promise.resolve(Response.json(body, { status }));
   const fetchFn = (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(input instanceof Request ? input.url : input);
     const path = url.pathname;
+    w.unsignalled += init?.signal instanceof AbortSignal ? 0 : 1;
     if (url.host === "api") {
       const body: unknown = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
       w.requestIds.push(new Headers(init?.headers).get("x-request-id") ?? "");
@@ -113,6 +121,13 @@ describe("obs-check (001/FR-033)", () => {
     expect(ok).toBe(true);
     expect(w.requestIds).toHaveLength(2);
     expect(w.requestIds[0]).not.toBe(w.requestIds[1]);
+  });
+
+  it("001/FR-033: every request carries a timeout signal, so a silent service can't hang it", async () => {
+    const { w, run } = world();
+    await run();
+    expect(w.unsignalled).toBe(0);
+    expect(REQUEST_TIMEOUT_MS).toBeLessThan(POLL_TIMEOUT_MS);
   });
 
   it.each<[string, (w: World) => void, string]>([

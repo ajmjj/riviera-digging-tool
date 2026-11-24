@@ -20,6 +20,8 @@ export interface ObsDeps {
 /** SC-001/SC-002: traces, logs and metrics must be queryable within 30 s. */
 export const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
+/** Per request, so a service that accepts the connection but never answers can't hang the check. */
+export const REQUEST_TIMEOUT_MS = 10_000;
 const JOB = "sample.discogs_release";
 
 function fail(message: string): never {
@@ -48,7 +50,7 @@ function str(value: unknown): string {
 }
 
 async function getJson(deps: ObsDeps, url: string, init?: RequestInit): Promise<unknown> {
-  const res = await deps.fetch(url, init);
+  const res = await deps.fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (!res.ok) {
     fail(`${init?.method ?? "GET"} ${url} answered HTTP ${String(res.status)}`);
   }
@@ -201,6 +203,7 @@ async function sendSample(urls: ObsUrls, deps: ObsDeps, flow: "ok" | "fail") {
       "x-request-id": `obs-check-${flow}-${String(deps.now())}`,
     },
     body: JSON.stringify({ failJob: flow === "fail" }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (res.status === 404) {
     fail(
