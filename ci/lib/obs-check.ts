@@ -1,13 +1,14 @@
-// End-to-end observability check against the running stack (001/FR-033, research R14 steps 2-3).
-// Each step asks the stack's own query interfaces (Tempo, Loki, Prometheus) and fails with a
-// message that says what was missing. The CLI is ci/obs-check.ts. The Grafana dashboard steps
-// and the SLO samples (R14 steps 1, 4 and 5) follow in the next T023 PR.
+// End-to-end observability check against the running stack (001/FR-033, research R14). Each step
+// asks the stack's own query interfaces (Tempo, Loki, Prometheus, Grafana) and fails with a
+// message that says what was missing. The CLI is ci/obs-check.ts. The SLO samples and the panel
+// values they produce (R14 step 4) are the last T023 PR.
 
 export interface ObsUrls {
   readonly api: string;
   readonly tempo: string;
   readonly loki: string;
   readonly prometheus: string;
+  readonly grafana: string;
 }
 
 export interface ObsDeps {
@@ -174,23 +175,122 @@ async function checkLogs(urls: ObsUrls, deps: ObsDeps, what: string, filters: st
   });
 }
 
-const SERVICE_SERIES = [
+/** Counters this run's samples must raise; read once before the sample requests. */
+const RISING_SERIES = [
   `sum(riviera_http_server_duration_seconds_count{route="/sample/trace"})`,
   `sum(riviera_jobs_runs_total{job_name="${JOB}",outcome="succeeded"})`,
   `sum(riviera_jobs_failures_total{job_name="${JOB}"})`,
   `sum(riviera_external_calls_total{service="common_ground",outcome="success"})`,
   `sum(riviera_external_calls_total{service="discogs",outcome="success"})`,
-  `count(riviera_queue_depth{job_name="${JOB}"})`,
 ];
+/** A gauge: it only has to be exported (0 for an empty queue is a value). */
+const QUEUE_DEPTH = `count(riviera_queue_depth{job_name="${JOB}"})`;
 
-async function checkMetrics(urls: ObsUrls, deps: ObsDeps) {
-  for (const query of SERVICE_SERIES) {
-    await poll(deps, `Prometheus series ${query}`, async () => {
-      const url = `${urls.prometheus}/api/v1/query?${new URLSearchParams({ query }).toString()}`;
-      const body = await getJson(deps, url);
-      const value = Number(list(at(list(at(body, "data", "result"))[0], "value"))[1]);
-      return value > 0 ? undefined : "no value above 0 yet";
-    });
+/** The first result of an instant query; 0 when there is no series yet. */
+async function promValue(urls: ObsUrls, deps: ObsDeps, query: string): Promise<number> {
+  const url = `${urls.prometheus}/api/v1/query?${new URLSearchParams({ query }).toString()}`;
+  const value = Number(
+    list(at(list(at(await getJson(deps, url), "data", "result"))[0], "value"))[1],
+  );
+  return Number.isFinite(value) ? value : 0;
+}
+
+interface Baseline {
+  readonly query: string;
+  readonly before: number;
+}
+
+async function readBaselines(urls: ObsUrls, deps: ObsDeps): Promise<Baseline[]> {
+  const baselines: Baseline[] = [];
+  for (const query of RISING_SERIES) {
+    baselines.push({ query, before: await promValue(urls, deps, query) });
+  }
+  return baselines;
+}
+
+async function checkMetrics(urls: ObsUrls, deps: ObsDeps, baselines: readonly Baseline[]) {
+  for (const { query, before } of baselines) {
+    await poll(deps, `Prometheus series ${query}`, async () =>
+      (await promValue(urls, deps, query)) > before
+        ? undefined
+        : `not above ${String(before)}, its value before the sample requests`,
+    );
+  }
+  await poll(deps, `Prometheus series ${QUEUE_DEPTH}`, async () =>
+    (await promValue(urls, deps, QUEUE_DEPTH)) > 0 ? undefined : "not exported yet",
+  );
+}
+
+interface PanelQuery {
+  readonly panel: string;
+  readonly expr: string;
+  readonly instant: boolean;
+  readonly stat: boolean;
+}
+
+async function checkSearch(urls: ObsUrls, deps: ObsDeps, sloIds: readonly string[]) {
+  const found = list(await getJson(deps, `${urls.grafana}/api/search?type=dash-db&limit=5000`));
+  const items = found.filter(isRecord);
+  const slos = items.filter((d) => d["folderTitle"] === "SLOs").map((d) => str(d["uid"]));
+  const expected = sloIds.map((id) => `slo-${id}`);
+  if ([...slos].sort().join() !== [...expected].sort().join()) {
+    fail(`folder "SLOs" holds [${slos.join(", ")}], expected exactly [${expected.join(", ")}]`);
+  }
+  if (!items.some((d) => d["uid"] === "service-overview")) {
+    fail("the overview dashboard (uid service-overview) is not provisioned");
+  }
+}
+
+/** Every Prometheus query of a dashboard except constant targets such as `vector(0.999)`. */
+async function panelQueries(urls: ObsUrls, deps: ObsDeps, uid: string): Promise<PanelQuery[]> {
+  const body = await getJson(deps, `${urls.grafana}/api/dashboards/uid/${uid}`);
+  return list(at(body, "dashboard", "panels"))
+    .flatMap((panel) =>
+      list(at(panel, "targets")).map((t) => ({
+        panel: str(at(panel, "title")),
+        expr: str(at(t, "expr")),
+        instant: at(t, "instant") === true,
+        stat: at(panel, "type") === "stat",
+      })),
+    )
+    .filter((q) => !/^vector\([\d.]+\)$/.test(q.expr));
+}
+
+/** Runs one panel query through Grafana; true if any frame holds a finite value. */
+async function hasValue(urls: ObsUrls, deps: ObsDeps, q: PanelQuery): Promise<boolean> {
+  const query = {
+    refId: "A",
+    datasource: { type: "prometheus", uid: "prometheus" },
+    expr: q.expr,
+    instant: q.instant,
+    range: !q.instant,
+    maxDataPoints: 100,
+  };
+  const body = await getJson(deps, `${urls.grafana}/api/ds/query`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ queries: [query], from: "now-28d", to: "now" }),
+  });
+  const error = at(body, "results", "A", "error");
+  if (typeof error === "string") {
+    fail(`Grafana query for "${q.panel}" failed: ${error}`);
+  }
+  // Each frame's first column is the time; any finite number in the others is a value.
+  return list(at(body, "results", "A", "frames"))
+    .flatMap((frame) => list(at(frame, "data", "values")).slice(1))
+    .some((column) => list(column).some((v) => typeof v === "number" && Number.isFinite(v)));
+}
+
+async function checkNoData(urls: ObsUrls, deps: ObsDeps, sloIds: readonly string[]) {
+  for (const id of sloIds) {
+    for (const q of await panelQueries(urls, deps, `slo-${id}`)) {
+      if (await hasValue(urls, deps, q)) {
+        fail(
+          `slo-${id} panel "${q.panel}" shows data before any samples were sent (the check ` +
+            "needs fresh volumes: docker compose --profile dev --profile observability down --volumes)",
+        );
+      }
+    }
   }
 }
 
@@ -229,8 +329,12 @@ async function sendSample(urls: ObsUrls, deps: ObsDeps, flow: "ok" | "fail") {
   return result;
 }
 
-/** Runs R14 steps 2-3 in order; stops at the first failure. True if all pass. */
-export async function runObsCheck(urls: ObsUrls, deps: ObsDeps): Promise<boolean> {
+/** Runs R14 steps 1-3 and 5 in order (the SLO samples of step 4 follow); stops at the first failure. True if all pass. */
+export async function runObsCheck(
+  urls: ObsUrls,
+  deps: ObsDeps,
+  sloIds: readonly string[],
+): Promise<boolean> {
   let current = "";
   async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
     current = name;
@@ -239,10 +343,20 @@ export async function runObsCheck(urls: ObsUrls, deps: ObsDeps): Promise<boolean
     return value;
   }
   try {
-    const samples = await step("sample request accepted, with and without failJob", async () => [
-      { ...(await sendSample(urls, deps, "ok")), failed: false },
-      { ...(await sendSample(urls, deps, "fail")), failed: true },
-    ]);
+    await step("Grafana has the 7 SLO dashboards and the overview", () =>
+      checkSearch(urls, deps, sloIds),
+    );
+    await step("SLO panels show no data before samples", () => checkNoData(urls, deps, sloIds));
+    const { baselines, samples } = await step(
+      "sample request accepted, with and without failJob",
+      async () => ({
+        baselines: await readBaselines(urls, deps),
+        samples: [
+          { ...(await sendSample(urls, deps, "ok")), failed: false },
+          { ...(await sendSample(urls, deps, "fail")), failed: true },
+        ],
+      }),
+    );
     await step("request traces, job traces and their log lines arrive", async () => {
       for (const s of samples) {
         await checkRequestTrace(urls, deps, s.traceId);
@@ -252,8 +366,8 @@ export async function runObsCheck(urls: ObsUrls, deps: ObsDeps): Promise<boolean
         await checkLogs(urls, deps, "job", `| trace_id="${jobTraceId}" | job_id="${s.jobId}"`);
       }
     });
-    await step("http, job, external and queue-depth metrics arrive", () =>
-      checkMetrics(urls, deps),
+    await step("http, job and external counters rise; queue depth is exported", () =>
+      checkMetrics(urls, deps, baselines),
     );
     return true;
   } catch (error) {
