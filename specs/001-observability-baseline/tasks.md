@@ -114,7 +114,7 @@ job logs and job metrics.
 
 **Independent test**: quickstart.md §6; automated by T019.
 
-- [ ] T019 [US4] End-to-end redaction suite `apps/api/test/integration/redaction.int.test.ts`: sample requests and jobs whose headers (`Authorization: Bearer …`, `Cookie`), body, query string (`?token=…`), job payload, staff context and thrown error messages contain planted emails, tokens, cookies and secret-named fields; captures stdout and the in-memory span and log exporters and asserts zero occurrences (SC-005), redaction markers present, only `staff_test_0001` as staff identity. Build the planted secret-shaped values at runtime (e.g. by joining parts) so no secret-shaped literal is committed and gitleaks stays green without an allowlist change. Fix any leak found in the owning module in the same PR. Depends on T016, T018. **FR-004, FR-005, FR-032** · ~250 lines
+- [X] T019 [US4] End-to-end redaction suite `apps/api/test/integration/redaction.int.test.ts`: sample requests and jobs whose headers (`Authorization: Bearer …`, `Cookie`), body, query string (`?token=…`), job payload, staff context and thrown error messages contain planted emails, tokens, cookies and secret-named fields; captures stdout and the in-memory span and log exporters and asserts zero occurrences (SC-005), redaction markers present, only `staff_test_0001` as staff identity. Build the planted secret-shaped values at runtime (e.g. by joining parts) so no secret-shaped literal is committed and gitleaks stays green without an allowlist change. Fix any leak found in the owning module in the same PR. Depends on T016, T018. **FR-004, FR-005, FR-032** · ~250 lines
 
 ---
 
