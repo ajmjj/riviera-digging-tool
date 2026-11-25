@@ -1,0 +1,21 @@
+# image: riviera-dig/tempo:local
+# from: docker/tempo.Dockerfile grafana/tempo:2.10.10@sha256:12b0820f13ffa10ce956b6e9acc3b03f3cffded99109be6cc09d106fe56e5d38
+# Protected (ci/**). Time-boxed Trivy exception for riviera-dig/tempo:local, built from
+# grafana/tempo:2.10.10 (PR #52, T024).
+# ci/trivy-scan.sh applies it only to the exact image on the `# image:` line below (and only
+# while the Dockerfile on the `# from:` line starts from that base); every other image is
+# scanned without exceptions. Each entry stops applying on
+# its `expired_at` date, after which the scan fails again until the pin is bumped or Antn
+# approves a renewal.
+#
+# Why: Go libraries compiled into the Tempo binary, fixed upstream in the libraries but in no
+# Tempo release yet (2.10.10 is the newest 2.x; 3.0.5 and 3.1.1 have the same findings, checked
+# 2026-11-24). Tempo runs only in the dev/CI `observability` profile, bound to 127.0.0.1, never on
+# the host's plain stack (research R17). Remove this file when a Tempo release passes the scan.
+vulnerabilities:
+  - id: CVE-2026-78661
+    statement: golang.org/x/net 0.60.0 bundled; fixed in x/net 0.62.0, no Tempo build yet
+    expired_at: 2026-12-31
+  - id: CVE-2026-116587
+    statement: github.com/go-jose/go-jose/v4 4.1.4 bundled; fixed in 4.1.6, no Tempo build yet
+    expired_at: 2026-12-31

@@ -35,3 +35,18 @@ description of the task it names, and that PR either acts on it or says why not.
   cover it; the stack job's second smoke through the proxy, after that up, is its end-to-end
   check, so keep that smoke step after the profile switch. `ci/smoke.ts` does not retry: if it
   runs within ~2 s of the api changing IP it can still see one 502.
+
+## After 001 (from PR #52): Trivy exceptions expire 2026-12-31
+
+- `ci/trivy-exceptions/{grafana,prometheus,tempo}.yaml` hold time-boxed exceptions, added in PR #52
+  as a recorded deviation from the Trivy gate (see that PR), for HIGH CVEs in Go libraries compiled into upstream `grafana/grafana:13.3.1`,
+  `prom/prometheus:v3.16.0` and `grafana/tempo:2.10.10` (x/net, go-jose, Go stdlib, Grafana's
+  bundled Tempo library). No upstream release had the fixes on 2026-11-25. `ci/trivy-scan.sh`
+  applies each file only to the exact image reference on its `# image:` line (for Tempo, also only
+  while `docker/tempo.Dockerfile` starts from the base on its `# from:` line); every other image is
+  scanned without exceptions.
+- When an upstream release passes `trivy image --severity HIGH,CRITICAL --ignore-unfixed` with no
+  ignore file, bump its pin (`docker-compose.yml`, or `docker/tempo.Dockerfile` for Tempo) and
+  delete its exception file in the same PR. Do this before 2026-12-31. After that date the
+  entries stop applying and the `stack` job fails until the pin is bumped or Antn approves a
+  renewal.
