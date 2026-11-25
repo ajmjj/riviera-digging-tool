@@ -41,6 +41,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: Can an admin remove admin rights from another admin or deactivate them, and can an admin demote or deactivate themself? → A: Admins can demote or deactivate other admins, never themselves; self-removal needs another admin.
 - Q: Should 002 already allow for a read-only role, so the shop owner could see the staff purchases log without being an admin? → A: No. Two roles only, admin and staff; any later role is a change to 002's role model.
 - Q: How should the first admin account (Antn's) be created on a fresh install, when there is no admin yet to send the invite? → A: A one-off host-machine command takes a name and email, creates the admin and sends an invite link; it refuses once any admin exists.
+- Q: Should an admin be able to reactivate a deactivated person, or change a person's email address? → A: Admins can reactivate (fresh invite link, same staff ID and history); email changes stay out of scope.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -134,7 +135,7 @@ success respectively.
 
 On the People pages, the admin sees everyone with their role, status (invited, active,
 deactivated) and when they were last seen. The admin can invite someone, resend or cancel a
-pending invite, deactivate an account, and make someone an admin.
+pending invite, deactivate an account, reactivate a deactivated one, and make someone an admin.
 
 **Why this priority**: Needed to run the team after launch, but Story 1's invite is enough to
 onboard the first colleagues.
@@ -154,9 +155,12 @@ person's status, their sessions, and the emails captured.
    everything they recorded in the tool (for example verdicts, once they exist) is kept.
 4. **Given** a deactivated person, **When** they request a sign-in link, **Then** they get the
    neutral message and no email.
-5. **Given** an admin invites an address that already belongs to an active or invited person,
-   **When** they save, **Then** the invite is refused with a message saying the person is
-   already on the list.
+5. **Given** an admin invites an address that already belongs to anyone on the list (invited,
+   active or deactivated), **When** they save, **Then** the invite is refused with a message
+   saying the person is already on the list (and, if deactivated, offering to reactivate them).
+6. **Given** a deactivated person, **When** the admin reactivates them, **Then** they get a fresh
+   invite email, and once they sign in from it they are active again under the same staff ID,
+   with everything they recorded before.
 
 ---
 
@@ -361,7 +365,11 @@ other out, and check its next request answers 401.
   sessions, remove their devices and push subscriptions, and invalidate their outstanding links
   and link codes, all at once. It MUST keep the person's record and everything recorded under
   their staff ID, and a deactivated person MUST NOT be able to sign in.
-- **FR-032**: Every People action (invite, resend, cancel, deactivate, role change) MUST be
+  Admins MUST be able to reactivate a deactivated person: this sets their status to "invited" and
+  sends a fresh invite link (FR-002, FR-005), keeping the same staff ID, role and everything
+  recorded under it; signing in from that link makes them active again (FR-010). Cancelling such
+  an invite (FR-029) returns the person to "deactivated" rather than removing them.
+- **FR-032**: Every People action (invite, resend, cancel, deactivate, reactivate, role change) MUST be
   recorded with who did it, to whom, what, and when, identified by staff IDs.
 - **FR-033**: There MUST be a one-off command, run on the host machine only and not reachable over
   HTTP, that takes a name and email address, creates that person as an invited admin and sends
@@ -457,8 +465,8 @@ other out, and check its next request answers 401.
 - The client a rate limit counts is identified by the connecting address the proxy reports.
   Behind the Cloudflare Tunnel that is Cloudflare's client-address header, trusted only from the
   tunnel; locally, the proxy's view of the client.
-- Reactivating a deactivated person and changing a person's email address are out of scope for
-  002. An admin who needs either can raise it as a later change.
+- Changing a person's email address is out of scope for 002 (clarified 2026-11-25); it can be
+  raised as a later change.
 - The team list (names, current box, heard count) that every staff member sees belongs to a later
   feature; this feature exposes no other person's data to staff.
 - Verdicts, piles and Discogs accounts don't exist yet. FR-026 and FR-027 set the rule they must
