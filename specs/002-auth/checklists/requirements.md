@@ -32,12 +32,11 @@
 ## Notes
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
-- **Three markers left for `/speckit-clarify`.** FR-013 (session lifetime, idle timeout,
-  remember-me), FR-030 (demoting admins, self-deactivation) and FR-037 (SMTP provider). They are
-  put to Antn one at a time in clarify instead of all at once here, as he asked.
-- **Proposed values to confirm in clarify.** FR-005 (15-minute sign-in link, 7-day invite link),
-  FR-020 and FR-021 (rate limits). See Assumptions.
+- **Clarify is complete.** Two rounds on 2026-11-25 settled 10 questions; the answers are in the
+  spec's Clarifications section and no [NEEDS CLARIFICATION] markers remain.
 - **Named settings and status codes are constraints, not design.** `APP_URL`, `SESSION_SECRET`,
-  `SMTP_URL`, 401/403 and the cookie properties come from the brief, the constitution and
-  `.env.example`, and they are what the security tests assert. The spec doesn't choose libraries,
-  storage layout or the CSRF token mechanism; those belong in `/speckit-plan`.
+  `SMTP_URL`, `EMAIL_FROM`, IONOS SMTP, 401/403, the cookie properties and the two checked
+  screen sizes come from the brief, the constitution, `.env.example` and Antn's answers, and they
+  are what the tests assert. The spec doesn't choose libraries, storage layout, the CSRF token
+  mechanism or how the client address is read behind the tunnel; those belong in
+  `/speckit-plan`.

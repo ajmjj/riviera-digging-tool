@@ -102,8 +102,11 @@ longer works.
    **Then** the browser receives a new session identifier and the old one no longer
    authenticates anything.
 4. **Given** a staff member requests two links in a row, **When** they open the older one,
-   **Then** it is refused, because a new link replaces any earlier unused sign-in link for the
-   same person.
+   **Then** it is refused, because a new sign-in link replaces any earlier unused sign-in link
+   for the same person.
+5. **Given** an invited person who hasn't used their invite yet, **When** they request and use
+   an ordinary sign-in link instead, **Then** they are signed in and become active; **and when**
+   someone else requests sign-in links for that address, **Then** the invite link keeps working.
 
 ---
 
@@ -280,13 +283,17 @@ other out, and check its next request answers 401.
   step with a "Confirm sign-in" button, and only pressing it uses the link, so that mail scanners
   and link previews can't spend it. The page MUST NOT confirm automatically, by script or
   otherwise.
-- **FR-008**: Issuing a new sign-in link or invite link for a person MUST invalidate every
-  earlier unused link for that person.
+- **FR-008**: Issuing a new sign-in link for a person MUST invalidate their earlier unused
+  sign-in links, and MUST NOT affect an outstanding invite link, so that someone who knows an
+  invitee's address can't cancel their invite by requesting sign-in links. Issuing a new invite
+  link (resend, reactivation) MUST invalidate every earlier unused link for that person, of
+  either kind.
 - **FR-009**: A refused link (unknown, altered, expired, used, cancelled, or for a deactivated
   person) MUST get one and the same message, offering to send a new link, without saying why it
   was refused.
-- **FR-010**: Completing sign-in from an invite link MUST change the person's status from
-  "invited" to "active".
+- **FR-010**: Any completed sign-in by an invited person, from an invite link or a sign-in link,
+  MUST change their status from "invited" to "active" and invalidate their remaining unused
+  links, so resend and cancel (FR-029) no longer apply to them.
 
 **Sessions and devices**
 
