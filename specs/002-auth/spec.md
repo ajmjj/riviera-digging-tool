@@ -35,6 +35,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 ### Session 2026-11-25
 
 - Q: How long should a sign-in link stay valid, and how long should an invite link stay valid? → A: Sign-in link 15 minutes; invite link 7 days.
+- Q: How long should a session last, after how much inactivity should it end, and should there be a "remember me" choice? → A: Sessions last 90 days, end after 30 days idle, no remember-me.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -276,9 +277,10 @@ other out, and check its next request answers 401.
   uses HTTPS, and that is not sent on cross-site sub-requests. Session identifiers MUST be
   unguessable (at least 128 bits of randomness) and stored server-side only in a form from
   which they cannot be recovered.
-- **FR-013**: A session MUST end [NEEDS CLARIFICATION: absolute session lifetime, idle
-  timeout, and whether there is a "remember me" choice]. An ended session MUST answer 401 and
-  remove its device record.
+- **FR-013**: A session MUST end 90 days after sign-in, or earlier once 30 days pass without an
+  authenticated request from it, judged by the server's clock. There is no "remember me" choice:
+  every session follows these limits. An ended session MUST answer 401 and remove its device
+  record.
 - **FR-014**: Each device record MUST hold the person it belongs to, a name, when it was
   created, when it was last seen, and optionally one push subscription. Its default name MUST be
   derived from the browser and platform (for example "iPhone · Safari"), and its owner MUST be
