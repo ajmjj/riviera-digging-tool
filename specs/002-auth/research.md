@@ -304,8 +304,9 @@ being written are marked **(decided)**.
   `\brd[lsp]_[A-Za-z0-9_-]{20,}` become `[REDACTED]`. Email addresses are already redacted by
   value. Names, link codes and push endpoints can't be recognised by shape, so the rule for them
   is that they are never passed to a logger or span. The planted-value test enforces this.
-- **Planted-value test** (FR-040, SC-006): `telemetry-planted.int.test.ts` runs every auth flow
-  with distinctive values: an email, a name, the link token, the code, the session cookie, the
+- **Planted-value test** (FR-040, SC-006): `telemetry-planted.int.test.ts` sends every served
+  route's sample request from the route inventory (R9), then runs the auth flows that need a
+  sequence (wrong codes up to the limit, People actions, the bootstrap), with distinctive values: an email, a name, the link token, the code, the session cookie, the
   CSRF token, a push endpoint, a client IP address and a User-Agent string. It collects stdout log lines and 001's in-memory spans,
   span events and metric points, and asserts that none of the planted strings appears.
 

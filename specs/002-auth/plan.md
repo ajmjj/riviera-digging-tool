@@ -1,6 +1,6 @@
 # Implementation Plan: Auth
 
-**Branch**: `002-auth-plan` (feature directory `specs/002-auth`) | **Date**: 2026-11-25 |
+**Feature directory**: `specs/002-auth` | **Date**: 2026-11-25 |
 **Spec**: [spec.md](./spec.md) (approved, ajmjj/riviera-digging-tool#55)
 
 **Input**: Feature specification from `specs/002-auth/spec.md`
@@ -159,53 +159,53 @@ pure rules under `domain/`, and the web screens are plain modules like today's s
 ## Test Map
 
 Every FR is named by at least one test (`002/FR-###` in the title). The files are under
-`apps/api/test/` unless they start with `e2e/`, `ci/` or `packages/`. `int` means
+`apps/api/test/` unless they start with `apps/web/`, `e2e/`, `ci/` or `packages/`. `int` means
 `*.int.test.ts` against Postgres.
 
 | FR | Test file(s) | What it asserts |
 |---|---|---|
 | 001 | `auth/admin-people.int` | only admins add people; no self-registration route is served (inventory) |
-| 002 | `domain/email.test`, `auth/admin-people.int` | staff role, invited, one email; trim and case; duplicate refused (409) |
-| 003 | `auth/link-request.int` | same 202 body for known, unknown, deactivated and cancelled addresses; email only for invited and active; median timing within 50 ms over 100 requests (SC-008) |
+| 002 | `domain/email.test`, `auth/admin-people.int`, `integration/migrate.int` | staff role, invited, one email; trim and case; duplicate refused (409) |
+| 003 | `auth/link-request.int`, `apps/web/test/sign-in.test` | same 202 body for known, unknown, deactivated and cancelled addresses; email only for invited and active; median timing within 50 ms over 100 requests (SC-008) |
 | 004 | `auth/keys.test`, `auth/links.int` | ≥ 256-bit `rdl_` tokens; the link starts with `APP_URL`; the database holds only the HMAC |
 | 005 | `domain/expiry.test`, `auth/links.int` | 15 min and 7 days, judged by the server clock (Postgres `now()` in the query; tests age rows with the fixtures' `ageRows()`, the domain rule takes an injected `now`) |
 | 006 | `auth/links.int` | used twice: refused; two concurrent confirms: exactly one session |
-| 007 | `auth/links.int`, `e2e/auth.spec` | inspect consumes nothing; no confirm request before the button is pressed |
+| 007 | `auth/links.int`, `e2e/auth.spec`, `apps/web/test/confirm.test` | inspect consumes nothing; no confirm request before the button is pressed |
 | 008 | `auth/links.int` | a new sign-in link kills older sign-in links, not the invite; resend kills both |
-| 009 | `auth/links.int` | identical refusal for unknown, altered, expired, used, cancelled and deactivated |
+| 009 | `auth/links.int`, `apps/web/test/api.test`, `apps/web/test/confirm.test` | identical refusal for unknown, altered, expired, used, cancelled and deactivated |
 | 010 | `auth/sign-in.int` | invited → active after either link; remaining links gone |
 | 011 | `auth/sign-in.int` | new session and device; the pre-sign-in cookie and the old session no longer authenticate (fixation) |
 | 012 | `auth/cookies.test`, `auth/keys.test` | HttpOnly, SameSite=Strict, host-only, Secure on HTTPS, `__Host-`; stored hash only |
 | 013 | `domain/expiry.test`, `auth/session.int` | 90 days absolute, 30 days idle; ended session gives 401 and its device is removed |
 | 014 | `domain/device-name.test`, `auth/devices.int` | default names; rename rules |
 | 015 | `auth/session.int` | last seen updated within 1 minute, no more than one write a minute |
-| 016 | `auth/devices.int` | list with current, rename, sign out one, others, current |
+| 016 | `auth/devices.int`, `apps/web/test/you.test` | list with current, rename, sign out one, others, current |
 | 017 | `auth/devices.int` | store, remove and validate the push subscription; the tool works without one |
-| 018 | `auth/codes.int` | 6 digits, 10 minutes, a new code replaces the old one, collision retry |
-| 019 | `auth/codes.int` | signs in as the owner under FR-011; one refusal for unknown, used and expired |
+| 018 | `auth/codes.int`, `apps/web/test/you.test` | 6 digits, 10 minutes, a new code replaces the old one, collision retry |
+| 019 | `auth/codes.int`, `apps/web/test/sign-in.test` | signs in as the owner under FR-011; one refusal for unknown, used and expired |
 | 020 | `domain/rate-window.test`, `auth/codes.int`, `proxy-config.test` | 10 wrong tries per client per 10 min, then even a correct code is refused; client header trust (R1) |
-| 021 | `domain/rate-window.test`, `auth/link-request.int`, `auth/client-key.test` | 3 per address per 15 min (unknown too), 20 per client per hour, 429 with retry-after, no email |
-| 022 | `auth/people.int` | the CHECK allows only admin and staff; the bootstrap admin is the only admin at launch |
+| 021 | `domain/rate-window.test`, `auth/link-request.int`, `auth/client-key.test`, `apps/web/test/sign-in.test` | 3 per address per 15 min (unknown too), 20 per client per hour, 429 with retry-after, no email |
+| 022 | `auth/people.int`, `integration/migrate.int` | the CHECK allows only admin and staff; the bootstrap admin is the only admin at launch |
 | 023 | `auth/unauthenticated-401.int`, `auth/route-inventory.test` | 401 on every non-public served route; the public allow-list is exact |
 | 024 | `auth/admin-403.int`, `auth/route-inventory.test` | 403 and no change for staff on every admin route; the list equals the served routes |
 | 025 | `auth/session.int` | a role change or deactivation applies to the next request |
 | 026 | `auth/isolation.int` | devices, sessions and subscriptions are reachable only by their owner, admins included (404) |
 | 027 | `auth/response-secrets.int` | the scan of every served route as each role finds no secret field or value |
-| 028 | `auth/admin-people.int`, `e2e/auth.spec` | list fields, device count, sign out everywhere; People and its actions at 1440×900 with a confirmation naming the person; at 390×844 only the "use a computer" note |
+| 028 | `auth/admin-people.int`, `e2e/people.spec`, `apps/web/test/people.test`, `apps/web/test/shell.test` | list fields, device count, sign out everywhere; People and its actions at 1440×900 with a confirmation naming the person; at 390×844 only the "use a computer" note |
 | 029 | `auth/admin-people.int` | resend and cancel only while invited; cancel removes the row, keeps the action without the address, allows a re-invite |
 | 030 | `domain/people-rules.test` (property), `auth/people.int` | promote and demote; never self; concurrent mutual demotion leaves one admin |
 | 031 | `auth/admin-people.int` | deactivation ends everything at once and keeps the record; reactivation keeps the staff ID; cancelling a reactivation returns to deactivated |
-| 032 | `auth/admin-people.int` | one `people_action` per action, staff IDs only |
+| 032 | `auth/admin-people.int`, `integration/migrate.int`, `integration/host-readdress.int` | one `people_action` per action, staff IDs only |
 | 033 | `auth/bootstrap.int` | creates and invites once; a changed setting moves the pending invite (same staff ID, old links dead, one action record) until an admin signs in, and is ignored after; same setting: no new email; empty setting: starts and logs without an address; never logs the address or link |
 | 034 | `auth/csrf.test`, `auth/csrf.int`, `auth/get-no-state.int` | 403 and no change on a missing or wrong token or origin, sign-in routes included; GET changes nothing but bookkeeping |
 | 035 | `auth/response-secrets.int`, `ci/test/bundle-scan.test` | no server secret in responses; `rd[lsp]_` and 64-hex patterns absent from `apps/web/dist`. The file is created for FR-027 earlier; its FR-035 cases arrive only in the last task (T038), which is the first to name 002/FR-035 |
-| 036 | `config.test` | refuses a missing or short `SESSION_SECRET`, missing SMTP and a plain-HTTP non-localhost `APP_URL` in production, naming the setting without its value |
+| 036 | `config.test`, `compose.test` | refuses a missing or short `SESSION_SECRET`, missing SMTP and a plain-HTTP non-localhost `APP_URL` in production, naming the setting without its value |
 | 037 | `email/transport.test`, `config.test` | one interface; `EMAIL_FROM` on rivierarecords.de; IONOS host allow-list; capture stores and sends nothing |
-| 038 | `config.test` | `SMTP_URL` outside production refuses to start |
+| 038 | `config.test`, `compose.test` | `SMTP_URL` outside production refuses to start |
 | 039 | `email/templates.test` | link, name and lifetime present; no staff ID or other secret |
 | 040 | `auth/telemetry-planted.int`, `packages/telemetry/test/redact.test`, `proxy-config.test` | planted values, including a client IP and a User-Agent, absent from logs, spans and metrics; `rd[lsp]_` values redacted; the proxy's log format names no IP or User-Agent variable |
 | 041 | `auth/telemetry.int`, `packages/telemetry/test/slo-metrics.test` | each event's counter and log line by outcome; closed label sets |
-| 042 | `auth/browser-protections.int`, `proxy-config.test`, `e2e/auth.spec` | CSP, frame, referrer and nosniff headers on every served route (inventory), in the proxy config and on the pages |
+| 042 | `auth/browser-protections.int`, `proxy-config.test`, `e2e/people.spec` | CSP, frame, referrer and nosniff headers on every served route (inventory), in the proxy config and on the pages |
 
 The constitution's auth security tests map to FR-005/006 (expiry, single use), FR-011
 (fixation), FR-034 (CSRF) and FR-024/030 (roles). The smoke test gains "sign in through the
