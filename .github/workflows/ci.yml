@@ -135,6 +135,7 @@ jobs:
       # Both profiles, so the mocks and the derived observability images are built here and
       # Trivy scans these local builds instead of pulling anything (research R11).
       - name: Build every image
+        id: build
         run: |
           cp .env.example .env
           docker compose --profile dev --profile observability build
@@ -182,15 +183,42 @@ jobs:
         run: node ci/smoke.ts
       - name: End-to-end observability check (FR-033)
         run: node ci/obs-check.ts
+      # Each sample request enqueues a job; measure with an empty queue, so the worker draining
+      # earlier jobs doesn't load the stack during the measurement (review of #52).
+      - name: Wait for the sample-job queue to drain (before the baseline)
+        run: |
+          for _ in $(seq 120); do
+            left=$(docker compose exec -T db sh -c \
+              'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM job WHERE status IN ('"'"'queued'"'"', '"'"'running'"'"')"')
+            [ "$left" = 0 ] && exit 0
+            sleep 1
+          done
+          echo "The job queue still holds $left jobs after 120 s."
+          exit 1
       - name: Sample request latency with the collector running (SC-006 baseline)
         run: node ci/latency.ts baseline "$RUNNER_TEMP/latency-baseline.json"
       - name: Stop the collector
         run: docker compose --profile dev --profile observability stop otel-collector
       - name: Smoke test with the collector stopped (US5-2)
         run: node ci/smoke.ts
+      # Each sample request enqueues a job; measure with an empty queue, so the worker draining
+      # earlier jobs doesn't load the stack during the measurement (review of #52).
+      - name: Wait for the sample-job queue to drain (before the comparison)
+        run: |
+          for _ in $(seq 120); do
+            left=$(docker compose exec -T db sh -c \
+              'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM job WHERE status IN ('"'"'queued'"'"', '"'"'running'"'"')"')
+            [ "$left" = 0 ] && exit 0
+            sleep 1
+          done
+          echo "The job queue still holds $left jobs after 120 s."
+          exit 1
       - name: Sample request latency with the collector stopped (SC-006)
         run: node ci/latency.ts compare "$RUNNER_TEMP/latency-baseline.json"
+      # The scan runs whenever the images built, even if a stack step above failed, so its result
+      # is always shown (review of #52).
       - name: Install Trivy (pinned, checksum verified)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
           TRIVY_VERSION: 0.76.2
           TRIVY_SHA256: bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf
@@ -199,11 +227,25 @@ jobs:
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           echo "${TRIVY_SHA256}  /tmp/trivy.tgz" | sha256sum --check
           tar -xzf /tmp/trivy.tgz -C /tmp trivy
+      # Every image is scanned and reported, even after a failure. An image with a file in
+      # ci/trivy-exceptions/ (named after the image, e.g. grafana.yaml) is scanned with that
+      # time-boxed exception list; every other image with none.
       - name: Scan every image in the stack (fail on high or critical)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
+          rc=0
           for image in $(docker compose --profile dev --profile observability config --images | sort -u); do
-            /tmp/trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress "$image"
+            name=${image%%[:@]*}
+            name=${name##*/}
+            ignore=()
+            if [ -f "ci/trivy-exceptions/$name.yaml" ]; then
+              ignore=(--ignorefile "ci/trivy-exceptions/$name.yaml")
+              echo "::notice::$image scanned with the time-boxed exceptions in ci/trivy-exceptions/$name.yaml"
+            fi
+            /tmp/trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress \
+              "${ignore[@]}" "$image" || rc=1
           done
+          exit "$rc"
       - name: Compose logs
         if: failure()
         run: docker compose --profile dev --profile observability logs --no-color

@@ -14,7 +14,15 @@ if ((mode !== "baseline" && mode !== "compare") || file === undefined) {
   process.exit(2);
 }
 const baseUrl = process.env["SMOKE_BASE_URL"] ?? "http://127.0.0.1:8080";
-const measured = p95(await measure(baseUrl, { fetch, now: () => performance.now() }));
+let measured: number;
+try {
+  measured = p95(await measure(baseUrl, { fetch, now: () => performance.now() }));
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.log(`FAIL ${mode}: ${message}`);
+  summary(`**SC-006 latency (${mode}):** FAIL, ${message}`);
+  process.exit(1);
+}
 
 if (mode === "baseline") {
   writeFileSync(file, JSON.stringify({ p95Ms: measured }));

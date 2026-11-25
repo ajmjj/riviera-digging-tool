@@ -1,0 +1,32 @@
+# Protected (ci/**). Time-boxed Trivy exception for grafana/grafana:13.3.1 (PR #52, T024).
+# Used only when the CI `stack` job scans this image (`--ignorefile`); every other image is
+# scanned without exceptions. Each entry stops applying on its `expired_at` date, after which the
+# scan fails again until the pin is bumped or Antn approves a renewal.
+#
+# Why: HIGH findings in Go libraries compiled into Grafana's own binaries, all fixed upstream in
+# the libraries but in no Grafana release yet (13.3.2, 13.2.6, 13.1.11 and 13.0.14 checked
+# 2026-11-24/25 all still fail). Grafana runs only in the dev/CI `observability` profile, bound to
+# 127.0.0.1, never on the host's plain stack (research R17). Remove this file when a Grafana
+# release passes the scan.
+vulnerabilities:
+  - id: CVE-2026-78661
+    statement: golang.org/x/net (0.58-0.61 bundled); fixed in x/net 0.62.0, no Grafana build yet
+    expired_at: 2026-12-31
+  - id: CVE-2026-78669
+    statement: golang.org/x/net 0.58.0 and Go stdlib 1.26.7 bundled; no Grafana build with the fix yet
+    expired_at: 2026-12-31
+  - id: CVE-2026-78667
+    statement: Go stdlib 1.26.7 bundled; fixed in Go 1.26.9, no Grafana build yet
+    expired_at: 2026-12-31
+  - id: CVE-2026-97031
+    statement: Go stdlib 1.26.7 bundled; fixed in Go 1.26.9, no Grafana build yet
+    expired_at: 2026-12-31
+  - id: CVE-2026-111943
+    statement: Go stdlib 1.26.7 bundled; fixed in Go 1.26.10, no Grafana build yet
+    expired_at: 2026-12-31
+  - id: CVE-2026-21728
+    statement: Grafana's bundled Tempo library; fixed in Tempo 2.10.2, not yet taken by Grafana
+    expired_at: 2026-12-31
+  - id: CVE-2026-28377
+    statement: Grafana's bundled Tempo library; fixed in Tempo 2.10.3, not yet taken by Grafana
+    expired_at: 2026-12-31

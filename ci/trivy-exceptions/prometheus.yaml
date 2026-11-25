@@ -1,0 +1,13 @@
+# Protected (ci/**). Time-boxed Trivy exception for prom/prometheus:v3.16.0 (PR #52, T024).
+# Used only when the CI `stack` job scans this image (`--ignorefile`); every other image is
+# scanned without exceptions. The entry stops applying on its `expired_at` date, after which the
+# scan fails again until the pin is bumped or Antn approves a renewal.
+#
+# Why: golang.org/x/net 0.61.0 is compiled into Prometheus; the fix is in x/net 0.62.0, and
+# v3.16.0 is the newest Prometheus release (checked 2026-11-25). Prometheus runs only in the
+# dev/CI `observability` profile, bound to 127.0.0.1, never on the host's plain stack (research
+# R17). Remove this file when a Prometheus release passes the scan.
+vulnerabilities:
+  - id: CVE-2026-78661
+    statement: golang.org/x/net 0.61.0 bundled; fixed in x/net 0.62.0, no Prometheus build yet
+    expired_at: 2026-12-31
