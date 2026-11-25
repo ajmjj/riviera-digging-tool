@@ -420,7 +420,8 @@ other out, and check its next request answers 401.
   recorded under it; signing in from that link makes them active again (FR-010). Cancelling such
   an invite (FR-029) returns the person to "deactivated" rather than removing them.
 - **FR-032**: Every People action (invite, resend, cancel, deactivate, reactivate, role change,
-  sign out everywhere, and the first-admin address change of FR-033) MUST be
+  sign out everywhere, the first-admin address change of FR-033, and the manual host recovery in
+  Assumptions) MUST be
   recorded with who did it, to whom, what, and when, identified by staff IDs.
 - **FR-033**: The first admin MUST come from the `.env` setting `INITIAL_ADMIN_EMAIL` (for this
   install, Antn's address; it is set only in `.env` and never committed, and `.env.example` names

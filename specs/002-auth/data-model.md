@@ -106,7 +106,7 @@ expired code.
 |---|---|---|
 | `id` | `bigint` identity PK | |
 | `at` | `timestamptz` not null | default `now()` |
-| `actor_staff_id` | `text` null | null means the startup bootstrap (FR-033) |
+| `actor_staff_id` | `text` null | null means no person acted: the startup bootstrap (FR-033) or the manual host recovery (spec Assumptions) |
 | `target_staff_id` | `text` not null | **no FK**: outlives a removed person (FR-029) |
 | `action` | `text` not null | `invite` \| `resend` \| `cancel` \| `deactivate` \| `reactivate` \| `role_change` \| `sign_out_everywhere` \| `first_admin_readdress` (FR-033) \| `host_readdress` (manual recovery, spec Assumptions) |
 | `detail` | `jsonb` not null | default `{}`; only closed values such as `{ "role": "admin" }`; never an address or name |

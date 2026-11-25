@@ -90,24 +90,30 @@ second admin early to avoid it. On the host:
    ```
 
 2. Find the admin's staff ID with `SELECT id, role, status FROM staff WHERE role = 'admin';`.
-3. Run this as one transaction, with the ID and the new address filled in. It changes the address
+3. Run this single statement, with the ID and the new address filled in. It changes the address
    (normalized as the api does it), invalidates that person's links, link code and sessions
    (deleting the devices removes their sessions), and records the change without either
-   address:
+   address. Every step acts only on the row the `UPDATE` changed, and one statement is one
+   transaction, so a wrong ID, or a person who isn't an active admin, changes nothing:
 
    ```sql
-   BEGIN;
-   UPDATE staff SET email = lower(btrim(normalize('new-address@example.org', NFC)))
-     WHERE id = '<staff id>' AND role = 'admin' AND status = 'active';
-   DELETE FROM magic_link WHERE staff_id = '<staff id>';
-   DELETE FROM link_code WHERE staff_id = '<staff id>';
-   DELETE FROM device WHERE staff_id = '<staff id>';
+   WITH changed AS (
+     UPDATE staff SET email = lower(btrim(normalize('new-address@example.org', NFC)))
+       WHERE id = '<staff id>' AND role = 'admin' AND status = 'active'
+       RETURNING id
+   ), links AS (
+     DELETE FROM magic_link WHERE staff_id IN (SELECT id FROM changed)
+   ), codes AS (
+     DELETE FROM link_code WHERE staff_id IN (SELECT id FROM changed)
+   ), devices AS (
+     DELETE FROM device WHERE staff_id IN (SELECT id FROM changed)
+   )
    INSERT INTO people_action (actor_staff_id, target_staff_id, action)
-     VALUES (NULL, '<staff id>', 'host_readdress');
-   COMMIT;
+     SELECT NULL, id, 'host_readdress' FROM changed;
    ```
 
-   If the `UPDATE` reports `UPDATE 0`, run `ROLLBACK;` and check the ID.
+   `INSERT 0 1` means it was done. `INSERT 0 0` means no active admin has that ID and nothing
+   changed: check the ID.
 
 4. Request a sign-in link for the new address on the sign-in screen.
 
