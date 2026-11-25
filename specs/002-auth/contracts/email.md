@@ -4,11 +4,12 @@
 
 | Name | Meaning | Where it is read |
 |---|---|---|
-| `SESSION_SECRET` | ≥ 32 bytes; HKDF input for every token key (research R4) | api, worker |
+| `SESSION_SECRET` | ≥ 32 bytes; HKDF input for every token key (research R4) | api, worker (shared `loadConfig`; no worker code uses it in 002) |
 | `SMTP_URL` | `smtps://user:password@smtp.ionos.de:465`; production only | api |
 | `EMAIL_FROM` | sender, on `rivierarecords.de`, e.g. `dig@rivierarecords.de` | api |
 | `INITIAL_ADMIN_EMAIL` | first admin's address, used only while no admin exists (FR-033) | api |
 | `INITIAL_ADMIN_NAME` | optional; defaults to the part of the address before `@` | api |
+| `EMAIL_CAPTURE_DIR` | development and CI only, refused in production: directory for the capture files below. Set by `docker-compose.capture.yml`, not in `.env.example`; when unset, captured mail stays in memory | api |
 
 Startup refusals name the setting and never print its value. For example:
 `SESSION_SECRET is missing or shorter than 32 bytes`,

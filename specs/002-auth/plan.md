@@ -52,7 +52,8 @@ repository query, the races and the route-inventory-driven security tests; Playw
 Safari and desktop browsers for the PWA.
 
 **Project Type**: web service (api) and PWA (web). The worker is untouched except that it now
-needs `SESSION_SECRET`.
+needs `SESSION_SECRET`: both roles start from the same image and the same `loadConfig`, which
+checks it for both (research R8). No worker code uses it in 002.
 
 **Performance Goals**: auth adds one indexed session lookup per request, plus at most one
 last-seen write a minute per device. Unknown and known addresses answer within 50 ms of each
@@ -74,10 +75,10 @@ Antn (research R8 "Fresh install", R9 "The sample route").
 | Principle / gate | How this plan complies | Status |
 |---|---|---|
 | I. CI is the only path to `main` | Every task is a PR through the existing checks. No new required check: the sign-in smoke step and the security tests run inside existing jobs. | ✅ |
-| II. Never weaken the safety net | No threshold, suppression or ruleset change. Protected paths that implementation tasks will touch: `.github/workflows/ci.yml` (the plain-stack env of R8, the capture mount, adding the `rd[lsp]_` patterns to the bundle scan), `ci/lib/smoke.ts` and a new `ci/lib/sign-in.ts` with `ci/lib/obs-check.ts` and `ci/lib/latency.ts` using it (R9). Each such task is labelled `needs-human` and says why. This plan PR touches only `specs/002-auth/` and `.env.example`, neither protected; it is `needs-human` because it asks for `approved-exception` (fr-trace, size). | ✅ (exception requested) |
+| II. Never weaken the safety net | No threshold, suppression or ruleset change. Protected paths that implementation tasks touch (tasks.md): `.github/workflows/ci.yml` (T001: the stack env of R8, job-level `APP_URL` and `INITIAL_ADMIN_EMAIL`, the capture mount; T038: the bundle-scan step calls the new `ci/lib/bundle-scan.ts`), `ci/lib/sign-in.ts` and `ci/test/sign-in.test.ts` (T036), `ci/lib/obs-check.ts`, `ci/lib/latency.ts` and their tests (T037), and `ci/lib/smoke.ts`, `ci/lib/bundle-scan.ts` and their tests (T038). Each such task is labelled `needs-human` and says why. The plan PR (merged) touched only `specs/002-auth/` and `.env.example`, neither protected; it was `needs-human` because it asked for `approved-exception` (fr-trace, size). | ✅ |
 | III. Spec first, fully traceable | Every FR-001…FR-042 maps to at least one named test below; the task PRs write those tests first. Until the last task, `fr-trace` fails on untested 002 FRs, and each PR asks Antn for `approved-exception`. | ✅ |
 | IV. Tests lead and check something | Tests first in every task. The pure rules sit in `apps/api/src/domain/auth/`, so mutation testing and 95%/100% coverage apply (R12), which is stronger than required. Property tests cover email normalization, the rate-limit window, the People rules and the "at least one admin" invariant. No 001 test is weakened; registry and config test updates cite 002/FR-041 and FR-036. | ✅ |
-| V. Small PRs | Tasks are sized at about 400 lines or less. **Deviation**: this plan PR is about 900 lines of planning documents with no code, recorded in the PR for Antn's `approved-exception` as in 001. | ⚠️ deviation recorded |
+| V. Small PRs | Tasks are sized at about 400 lines or less (tasks.md; the larger ones were split after the analysis review). **Deviation, closed**: the plan PR was about 900 lines of planning documents with no code, recorded in that PR for Antn's `approved-exception` as in 001. | ✅ (deviation was recorded) |
 | VI. No live side effects | No Common Ground or Discogs call. Real email only from production with SMTP (FR-038); dev and CI capture to files; CI never sets `SMTP_URL`. | ✅ |
 | VII. Traces, metrics, logs | Auth counters with closed labels in the registry, zero-initialised; `withStaff()` on every authenticated request; one structured line per auth event; a planted-value redaction test (R10). The catalog is unchanged. | ✅ |
 | VIII. Product invariants | Secrets: no server secret in responses or the bundle; the response scan and the bundle scan are extended (R9). Isolation: per-person queries take the staff ID only from the session, never from the URL; admins see only the device count and "sign out everywhere" (FR-026, FR-028); "staff get 403 on every admin route" comes from the inventory-driven test. | ✅ |
@@ -96,14 +97,16 @@ changes.
 specs/002-auth/
 ├── spec.md
 ├── plan.md              # this file
-├── research.md          # R1–R14
+├── research.md          # R1–R16
 ├── data-model.md        # migration 0002_auth
 ├── quickstart.md
 ├── contracts/
 │   ├── http.md          # routes, answers, CSRF, cookies
 │   └── email.md         # settings, messages, capture file
-├── checklists/requirements.md
-└── tasks.md             # /speckit-tasks (not created here)
+├── checklists/
+│   ├── requirements.md
+│   └── security.md
+└── tasks.md             # /speckit-tasks: T001–T038
 ```
 
 ### Source Code (repository root)
@@ -117,6 +120,8 @@ apps/api/src/
 │   ├── people-rules.ts        # which action applies; self and last-admin rules
 │   └── device-name.ts
 ├── auth/
+│   ├── plugin.ts              # the encapsulated auth context and its hooks
+│   ├── browser-protections.ts # FR-042 headers on every api response (R15)
 │   ├── keys.ts                # HKDF purpose keys, HMAC, token generation (R4)
 │   ├── client-key.ts          # X-Riviera-Client-Ip, IPv6 /64 (R1)
 │   ├── cookies.ts             # session and pre cookies (R3)
@@ -136,14 +141,16 @@ apps/api/src/
 └── sample/routes.ts           # access "staff" (R9)
 apps/api/migrations/0002_auth.{up,down}.sql
 apps/api/test/auth/route-inventory.ts           # committed route lists (R9)
+apps/api/test/auth/{fixtures.ts,snapshot.ts,planted.ts}  # rows and ageRows(); table snapshots; planted-value collector
 packages/telemetry/src/{slo-metrics.ts,redact.ts}  # + auth counters, + rd[lsp]_ value rule
-apps/web/src/{api.ts,sign-in.ts,confirm.ts,you.ts,people.ts}
-e2e/auth.spec.ts
+apps/web/src/{api.ts,shell.ts,sign-in.ts,confirm.ts,you.ts,people.ts}
+e2e/{auth.spec.ts,people.spec.ts}, e2e/support/{mail.ts,fixtures.ts}   # shared admin session (R9)
 proxy/nginx.conf               # client header; tunnel listener 8081; log format without IP/UA (R1); browser protections (R15)
-docker-compose.yml             # edge network; env passthroughs; mail mount via up-dev/CI
+docker-compose.yml             # edge network; env passthroughs
+docker-compose.capture.yml     # dev/CI only: mail capture mount and EMAIL_CAPTURE_DIR
 Makefile                       # up-dev: dev secret, test INITIAL_ADMIN_EMAIL, capture dir
-.gitignore                     # .captured-mail/
-ci/lib/sign-in.ts, ci/lib/smoke.ts, ci/lib/obs-check.ts, ci/lib/latency.ts, .github/workflows/ci.yml   # protected
+.gitignore                     # .captured-mail/, .ci-session/
+ci/lib/{sign-in,smoke,obs-check,latency,bundle-scan}.ts, ci/test/*, .github/workflows/ci.yml   # protected
 ```
 
 **Structure Decision**: everything stays in the existing workspaces. Auth is api code with its
@@ -161,7 +168,7 @@ Every FR is named by at least one test (`002/FR-###` in the title). The files ar
 | 002 | `domain/email.test`, `auth/admin-people.int` | staff role, invited, one email; trim and case; duplicate refused (409) |
 | 003 | `auth/link-request.int` | same 202 body for known, unknown, deactivated and cancelled addresses; email only for invited and active; median timing within 50 ms over 100 requests (SC-008) |
 | 004 | `auth/keys.test`, `auth/links.int` | ≥ 256-bit `rdl_` tokens; the link starts with `APP_URL`; the database holds only the HMAC |
-| 005 | `domain/expiry.test`, `auth/links.int` | 15 min and 7 days, judged by the server clock (fake `now()` through a settable clock) |
+| 005 | `domain/expiry.test`, `auth/links.int` | 15 min and 7 days, judged by the server clock (Postgres `now()` in the query; tests age rows with the fixtures' `ageRows()`, the domain rule takes an injected `now`) |
 | 006 | `auth/links.int` | used twice: refused; two concurrent confirms: exactly one session |
 | 007 | `auth/links.int`, `e2e/auth.spec` | inspect consumes nothing; no confirm request before the button is pressed |
 | 008 | `auth/links.int` | a new sign-in link kills older sign-in links, not the invite; resend kills both |
@@ -191,7 +198,7 @@ Every FR is named by at least one test (`002/FR-###` in the title). The files ar
 | 032 | `auth/admin-people.int` | one `people_action` per action, staff IDs only |
 | 033 | `auth/bootstrap.int` | creates and invites once; a changed setting moves the pending invite (same staff ID, old links dead, one action record) until an admin signs in, and is ignored after; same setting: no new email; empty setting: starts and logs without an address; never logs the address or link |
 | 034 | `auth/csrf.test`, `auth/csrf.int`, `auth/get-no-state.int` | 403 and no change on a missing or wrong token or origin, sign-in routes included; GET changes nothing but bookkeeping |
-| 035 | `auth/response-secrets.int`, CI bundle scan | no server secret in responses; `rd[lsp]_` and 64-hex patterns absent from `apps/web/dist` |
+| 035 | `auth/response-secrets.int`, `ci/test/bundle-scan.test` | no server secret in responses; `rd[lsp]_` and 64-hex patterns absent from `apps/web/dist`. The file is created for FR-027 earlier; its FR-035 cases arrive only in the last task (T038), which is the first to name 002/FR-035 |
 | 036 | `config.test` | refuses a missing or short `SESSION_SECRET`, missing SMTP and a plain-HTTP non-localhost `APP_URL` in production, naming the setting without its value |
 | 037 | `email/transport.test`, `config.test` | one interface; `EMAIL_FROM` on rivierarecords.de; IONOS host allow-list; capture stores and sends nothing |
 | 038 | `config.test` | `SMTP_URL` outside production refuses to start |
@@ -218,12 +225,14 @@ captured invite" (R9), in `ci/lib/smoke.ts`.
   9. web screens and e2e
   10. CI (smoke, sign-in helper, obs-check, ci.yml)
 
-  The sample route switches to `staff` in the same PR as the CI helper, so `obs-check` never
-  breaks.
+  The sample route switches to `staff` in the same PR as the obs-check and latency change, right
+  after the CI sign-in helper, so `obs-check` never breaks. The response-secret and planted-value
+  suites land in step 3 with the route inventory (decided by Antn, 2026-11-25), so each later
+  route is scanned in its own PR.
 - **fr-trace**: fails on every task PR until the last one has tested all 42 FRs; each PR asks
   Antn for `approved-exception` and carries `needs-human`.
 - **Protected paths**: only T001 (the `ci.yml` environment of R8, which must merge before the
-  config task makes production fail closed) and the CI tasks T034 and T035 touch `ci/**` and
+  config task makes production fail closed) and the CI tasks T036, T037 and T038 touch `ci/**` and
   `.github/**`, and they say so (tasks.md).
 
 ## Complexity Tracking
