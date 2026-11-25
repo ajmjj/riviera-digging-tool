@@ -36,14 +36,16 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 
 - Q: How long should a sign-in link stay valid, and how long should an invite link stay valid? → A: Sign-in link 15 minutes; invite link 7 days.
 - Q: How long should a session last, after how much inactivity should it end, and should there be a "remember me" choice? → A: Sessions last 90 days, end after 30 days idle, no remember-me.
-- Q: What limits should apply to requests for sign-in links and to attempts at entering link codes? → A: Link requests 3 per email address per 15 min and 20 per client per hour; a code dies after 5 wrong tries; 10 wrong tries per client per 10 min; no tool-wide cap.
+- Q: What limits should apply to requests for sign-in links and to attempts at entering link codes? → A: Link requests 3 per email address per 15 min and 20 per client per hour; 10 wrong code tries per client per 10 min; no tool-wide cap. (Amended after review: a "code dies after 5 wrong tries" limit was dropped, because a code is entered without an email address, so a wrong guess can't be tied to a code.)
 - Q: Which email service and sender address should send the sign-in and invite emails? → A: IONOS SMTP, sending from a mailbox on `rivierarecords.de` (for example `dig@rivierarecords.de`).
 - Q: Can an admin remove admin rights from another admin or deactivate them, and can an admin demote or deactivate themself? → A: Admins can demote or deactivate other admins, never themselves; self-removal needs another admin.
 - Q: Should 002 already allow for a read-only role, so the shop owner could see the staff purchases log without being an admin? → A: No. Two roles only, admin and staff; any later role is a change to 002's role model.
-- Q: How should the first admin account (Antn's) be created on a fresh install, when there is no admin yet to send the invite? → A: A one-off host-machine command takes a name and email, creates the admin and sends an invite link; it refuses once any admin exists.
+- Q: How should the first admin account (Antn's) be created on a fresh install, when there is no admin yet to send the invite? → A: A one-off host-machine command takes a name and email, creates the admin and sends an invite link; it refuses once any admin exists. (Superseded by the startup setting below.)
 - Q: Should an admin be able to reactivate a deactivated person, or change a person's email address? → A: Admins can reactivate (fresh invite link, same staff ID and history); email changes stay out of scope.
 - Q: What should an admin be able to see and do about other people's signed-in devices? → A: Admins see each person's device count and can "sign out everywhere" without deactivating, no device names; shown only in the laptop (computer) layout, not on phones.
 - Q: When someone opens a sign-in link, should they have to tap "Confirm sign-in" before they are signed in? → A: Yes: opening the link shows a "Confirm sign-in" button and only tapping it signs in; no automatic confirm by script.
+- Q: How should the first admin be created on a fresh install? (revisited) → A: From the `.env` setting `INITIAL_ADMIN_EMAIL` (Antn's address, set only in `.env`, never committed): at startup, if no admin exists, the api creates that admin and emails an invite; otherwise it does nothing.
+- Q: With the per-code counter dropped, should wrong link-code guesses get a tool-wide cap? → A: No; only 10 wrong tries per client per 10 min.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -266,7 +268,8 @@ other out, and check its next request answers 401.
 
 - **FR-001**: Access MUST be invite only. Only an admin can add a person, by name and email
   address; there is no self-registration.
-- **FR-002**: Inviting a person MUST create them with the staff role and the status "invited",
+- **FR-002**: Inviting a person MUST create them with the staff role (the first admin of FR-033
+  is the one exception) and the status "invited",
   and send one email containing a sign-in link. Email addresses MUST be compared after trimming
   spaces and ignoring letter case, and an address can belong to at most one person.
 - **FR-003**: Any visitor MUST be able to request a sign-in link by entering an email address.
@@ -330,9 +333,10 @@ other out, and check its next request answers 401.
 - **FR-019**: Entering a valid link code on the sign-in screen of another browser MUST sign that
   browser in as the code's owner, under FR-011. An unknown, used or expired code MUST be refused
   with one and the same message.
-- **FR-020**: A link code MUST be invalidated after 5 wrong attempts against it, and wrong code
-  attempts from one client MUST be limited to 10 per 10 minutes, after which every code attempt
-  from that client is refused until the window has passed.
+- **FR-020**: Wrong link-code attempts from one client MUST be limited to 10 per 10 minutes,
+  after which every code attempt from that client is refused until the window has passed. There
+  is no per-code or tool-wide limit (a code is entered without an email address, so a wrong
+  guess can't be tied to a particular code).
 
 **Rate limits**
 
@@ -385,8 +389,8 @@ other out, and check its next request answers 401.
 - **FR-030**: Admins MUST be able to make an active staff member an admin, and to make another
   admin a staff member again. An admin MUST NOT be able to demote or deactivate themself: those
   requests MUST be refused and change nothing, so giving up admin rights always needs another
-  admin. The tool MUST always keep at least one active admin, and MUST refuse any action that
-  would leave none.
+  admin. Once any admin has signed in, the tool MUST always keep at least one active admin, and
+  MUST refuse any action that would leave none.
 - **FR-031**: Admins MUST be able to deactivate any other person, other admins included (FR-030). Deactivation MUST end all their
   sessions, remove their devices and push subscriptions, and invalidate their outstanding links
   and link codes, all at once. It MUST keep the person's record and everything recorded under
@@ -398,10 +402,17 @@ other out, and check its next request answers 401.
 - **FR-032**: Every People action (invite, resend, cancel, deactivate, reactivate, role change,
   sign out everywhere) MUST be
   recorded with who did it, to whom, what, and when, identified by staff IDs.
-- **FR-033**: There MUST be a one-off command, run on the host machine only and not reachable over
-  HTTP, that takes a name and email address, creates that person as an invited admin and sends
-  them an invite link (FR-002, FR-005). It MUST refuse, changing nothing, once any admin exists
-  (active, invited or deactivated). It MUST NOT print the link or token.
+- **FR-033**: The first admin MUST come from the `.env` setting `INITIAL_ADMIN_EMAIL` (for this
+  install, Antn's address; it is set only in `.env` and never committed, and `.env.example` names
+  the setting with an empty value). The admin's name comes from the optional `INITIAL_ADMIN_NAME`,
+  or else from the part of the address before the `@`. When the api starts and no admin exists in any status,
+  it MUST create that person as an invited admin and send them an invite link (FR-002, FR-005),
+  so starting a fresh install emails the first admin. When any admin exists, startup MUST
+  change nothing and send nothing, whatever the setting says. The setting MUST NOT be reachable
+  over HTTP, and the api MUST NOT log or print the address, the link or the token. If no admin
+  exists and the setting is empty, the api MUST still start and MUST log, without any address,
+  that no first admin is configured. A first admin whose invite has expired gets in with an
+  ordinary sign-in link (FR-003, FR-010).
 
 **Request integrity and secrets**
 
@@ -417,7 +428,7 @@ other out, and check its next request answers 401.
   server-side secret. Session identifiers MUST reach the browser only in the cookie of FR-012.
 - **FR-036**: The session secret and SMTP credentials MUST come from `.env`
   (`SESSION_SECRET`, `SMTP_URL`), never from committed files; the sender address comes from
-  `EMAIL_FROM` (FR-037). The api MUST refuse to start in
+  `EMAIL_FROM` (FR-037) and the first admin's address from `INITIAL_ADMIN_EMAIL` (FR-033). The api MUST refuse to start in
   production if the session secret is missing or shorter than 32 bytes, or if no SMTP transport
   is configured, and MUST say which setting is missing without printing any value.
 
@@ -458,8 +469,7 @@ other out, and check its next request answers 401.
 - **Magic link**: a single-use, expiring sign-in or invite token for one person. Kind (sign-in
   or invite), issued, expires, used or invalidated. Only a non-recoverable form of the token is
   stored.
-- **Link code**: a 6-digit, single-use code for one person, valid 10 minutes, with a count of
-  wrong attempts.
+- **Link code**: a 6-digit, single-use code for one person, valid 10 minutes.
 - **People action record**: who did which People action to whom, and when.
 - **Outgoing email**: recipient, kind (invite, sign-in), the link, and the outcome of sending.
   In development and CI it is captured instead of sent.
@@ -488,8 +498,8 @@ other out, and check its next request answers 401.
 
 ## Assumptions
 
-- There is no tool-wide cap on wrong link-code attempts, only the per-code and per-client
-  limits of FR-020 (clarified 2026-11-25).
+- Wrong link-code attempts are limited only per client (FR-020, clarified 2026-11-25). Antn
+  accepted that someone guessing from many client addresses is not capped.
 - The client a rate limit counts is identified by the connecting address the proxy reports.
   Behind the Cloudflare Tunnel that is Cloudflare's client-address header, trusted only from the
   tunnel; locally, the proxy's view of the client.
