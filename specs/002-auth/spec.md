@@ -59,6 +59,10 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: How is the only admin's lost mailbox recovered? → A: With host access, by documented manual steps; no route or command in 002 (Assumptions).
 - Q: Which People actions exist on a phone, and do they ask for confirmation? → A: None: the People pages are laptop only. Deactivate, cancel, sign out everywhere and role changes ask for confirmation naming the person (FR-028).
 
+### Session 2026-11-25 (task list review)
+
+- Q: Can an admin deactivate someone who is still invited? → A: No. Deactivation applies to active people only; an invited person's invite is cancelled instead (FR-029, FR-031).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Accept an invite and sign in for the first time (Priority: P1)
@@ -411,7 +415,7 @@ other out, and check its next request answers 401.
   requests MUST be refused and change nothing, so giving up admin rights always needs another
   admin. Once any admin has signed in, the tool MUST always keep at least one active admin, and
   MUST refuse any action that would leave none.
-- **FR-031**: Admins MUST be able to deactivate any other person, other admins included (FR-030). Deactivation MUST end all their
+- **FR-031**: Admins MUST be able to deactivate any other active person, other admins included (FR-030); an invited person's invite is cancelled instead (FR-029). Deactivation MUST end all their
   sessions, remove their devices and push subscriptions, and invalidate their outstanding links
   and link codes, all at once. It MUST keep the person's record and everything recorded under
   their staff ID, and a deactivated person MUST NOT be able to sign in.
