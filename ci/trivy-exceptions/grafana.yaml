@@ -1,6 +1,7 @@
+# image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
 # Protected (ci/**). Time-boxed Trivy exception for grafana/grafana:13.3.1 (PR #52, T024).
-# Used only when the CI `stack` job scans this image (`--ignorefile`); every other image is
-# scanned without exceptions. Each entry stops applying on its `expired_at` date, after which the
+# ci/trivy-scan.sh applies it only to the exact image on the `# image:` line below; every other
+# image is scanned without exceptions. Each entry stops applying on its `expired_at` date, after which the
 # scan fails again until the pin is bumped or Antn approves a renewal.
 #
 # Why: HIGH findings in Go libraries compiled into Grafana's own binaries, all fixed upstream in

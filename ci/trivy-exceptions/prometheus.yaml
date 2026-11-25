@@ -1,6 +1,7 @@
+# image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
 # Protected (ci/**). Time-boxed Trivy exception for prom/prometheus:v3.16.0 (PR #52, T024).
-# Used only when the CI `stack` job scans this image (`--ignorefile`); every other image is
-# scanned without exceptions. The entry stops applying on its `expired_at` date, after which the
+# ci/trivy-scan.sh applies it only to the exact image on the `# image:` line below; every other
+# image is scanned without exceptions. The entry stops applying on its `expired_at` date, after which the
 # scan fails again until the pin is bumped or Antn approves a renewal.
 #
 # Why: golang.org/x/net 0.61.0 is compiled into Prometheus; the fix is in x/net 0.62.0, and

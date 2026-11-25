@@ -183,36 +183,17 @@ jobs:
         run: node ci/smoke.ts
       - name: End-to-end observability check (FR-033)
         run: node ci/obs-check.ts
-      # Each sample request enqueues a job; measure with an empty queue, so the worker draining
-      # earlier jobs doesn't load the stack during the measurement (review of #52).
-      - name: Wait for the sample-job queue to drain (before the baseline)
-        run: |
-          for _ in $(seq 120); do
-            left=$(docker compose exec -T db sh -c \
-              'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM job WHERE status IN ('"'"'queued'"'"', '"'"'running'"'"')"')
-            [ "$left" = 0 ] && exit 0
-            sleep 1
-          done
-          echo "The job queue still holds $left jobs after 120 s."
-          exit 1
+      # Each sample request enqueues a job; measure with an empty queue (review of #52).
+      - name: Wait for the job queue to drain (before the baseline)
+        run: ci/wait-job-queue.sh
       - name: Sample request latency with the collector running (SC-006 baseline)
         run: node ci/latency.ts baseline "$RUNNER_TEMP/latency-baseline.json"
       - name: Stop the collector
         run: docker compose --profile dev --profile observability stop otel-collector
       - name: Smoke test with the collector stopped (US5-2)
         run: node ci/smoke.ts
-      # Each sample request enqueues a job; measure with an empty queue, so the worker draining
-      # earlier jobs doesn't load the stack during the measurement (review of #52).
-      - name: Wait for the sample-job queue to drain (before the comparison)
-        run: |
-          for _ in $(seq 120); do
-            left=$(docker compose exec -T db sh -c \
-              'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM job WHERE status IN ('"'"'queued'"'"', '"'"'running'"'"')"')
-            [ "$left" = 0 ] && exit 0
-            sleep 1
-          done
-          echo "The job queue still holds $left jobs after 120 s."
-          exit 1
+      - name: Wait for the job queue to drain (before the comparison)
+        run: ci/wait-job-queue.sh
       - name: Sample request latency with the collector stopped (SC-006)
         run: node ci/latency.ts compare "$RUNNER_TEMP/latency-baseline.json"
       # The scan runs whenever the images built, even if a stack step above failed, so its result
@@ -227,25 +208,10 @@ jobs:
             "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           echo "${TRIVY_SHA256}  /tmp/trivy.tgz" | sha256sum --check
           tar -xzf /tmp/trivy.tgz -C /tmp trivy
-      # Every image is scanned and reported, even after a failure. An image with a file in
-      # ci/trivy-exceptions/ (named after the image, e.g. grafana.yaml) is scanned with that
-      # time-boxed exception list; every other image with none.
+      # Every image is scanned and reported; exceptions apply only as ci/trivy-scan.sh describes.
       - name: Scan every image in the stack (fail on high or critical)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          rc=0
-          for image in $(docker compose --profile dev --profile observability config --images | sort -u); do
-            name=${image%%[:@]*}
-            name=${name##*/}
-            ignore=()
-            if [ -f "ci/trivy-exceptions/$name.yaml" ]; then
-              ignore=(--ignorefile "ci/trivy-exceptions/$name.yaml")
-              echo "::notice::$image scanned with the time-boxed exceptions in ci/trivy-exceptions/$name.yaml"
-            fi
-            /tmp/trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress \
-              "${ignore[@]}" "$image" || rc=1
-          done
-          exit "$rc"
+        run: ci/trivy-scan.sh
       - name: Compose logs
         if: failure()
         run: docker compose --profile dev --profile observability logs --no-color
