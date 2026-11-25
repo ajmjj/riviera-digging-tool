@@ -12,7 +12,7 @@ these tables store HMACs.
 | Column | Type | Rule |
 |---|---|---|
 | `id` | `text` PK | `stf_` + 22 base64url chars; CHECK `^[A-Za-z0-9_-]{1,64}$` (001 `isStaffId`) |
-| `email` | `text` not null | trimmed, NFC, lower-cased before insert; CHECK `email = lower(btrim(email))`; changes only through the first-admin step of FR-033 |
+| `email` | `text` not null | trimmed, NFC, lower-cased before insert; CHECK `email = lower(btrim(email))`; changes only through the first-admin step of FR-033 or the manual host recovery (quickstart) |
 | `name` | `text` not null | 1–80 characters, trimmed |
 | `role` | `text` not null | `admin` \| `staff` (CHECK); FR-022 |
 | `status` | `text` not null | `invited` \| `active` \| `deactivated` (CHECK) |
@@ -106,9 +106,9 @@ expired code.
 |---|---|---|
 | `id` | `bigint` identity PK | |
 | `at` | `timestamptz` not null | default `now()` |
-| `actor_staff_id` | `text` null | null means the startup bootstrap (FR-033) |
+| `actor_staff_id` | `text` null | null means no person acted: the startup bootstrap (FR-033) or the manual host recovery (spec Assumptions) |
 | `target_staff_id` | `text` not null | **no FK**: outlives a removed person (FR-029) |
-| `action` | `text` not null | `invite` \| `resend` \| `cancel` \| `deactivate` \| `reactivate` \| `role_change` \| `sign_out_everywhere` \| `first_admin_readdress` (FR-033) |
+| `action` | `text` not null | `invite` \| `resend` \| `cancel` \| `deactivate` \| `reactivate` \| `role_change` \| `sign_out_everywhere` \| `first_admin_readdress` (FR-033) \| `host_readdress` (manual recovery, spec Assumptions) |
 | `detail` | `jsonb` not null | default `{}`; only closed values such as `{ "role": "admin" }`; never an address or name |
 
 The table is append-only: no update or delete path exists in the code.

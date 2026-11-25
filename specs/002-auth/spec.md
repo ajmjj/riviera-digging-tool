@@ -420,7 +420,8 @@ other out, and check its next request answers 401.
   recorded under it; signing in from that link makes them active again (FR-010). Cancelling such
   an invite (FR-029) returns the person to "deactivated" rather than removing them.
 - **FR-032**: Every People action (invite, resend, cancel, deactivate, reactivate, role change,
-  sign out everywhere, and the first-admin address change of FR-033) MUST be
+  sign out everywhere, the first-admin address change of FR-033, and the manual host recovery in
+  Assumptions) MUST be
   recorded with who did it, to whom, what, and when, identified by staff IDs.
 - **FR-033**: The first admin MUST come from the `.env` setting `INITIAL_ADMIN_EMAIL` (for this
   install, Antn's address; it is set only in `.env` and never committed, and `.env.example` names
@@ -431,8 +432,8 @@ other out, and check its next request answers 401.
   sign-in and the setting names a different address from the pending first admin's, startup
   MUST move that invite to the configured address: same staff ID, the new address and name (as
   above), every earlier link invalidated, a fresh invite sent, and the change recorded as a
-  People action without either address. This is the only way an address changes in this
-  feature. When the setting names the same address, startup changes nothing and sends nothing.
+  People action without either address. Apart from the manual host recovery in Assumptions,
+  this is the only way an address changes in this feature. When the setting names the same address, startup changes nothing and sends nothing.
   Once any admin has completed a sign-in, startup MUST change nothing and send nothing,
   whatever the setting says. The setting MUST NOT be reachable
   over HTTP, and the api MUST NOT log or print the address, the link or the token. If no admin
@@ -558,7 +559,9 @@ other out, and check its next request answers 401.
   make others admins (FR-030). Antn confirmed this reading on 2026-11-25 without amending the
   constitution.
 - If the only admin loses access to their mailbox, recovery needs access to the host machine:
-  the quickstart documents the manual database steps. This feature adds no recovery route or
-  command. Promoting a second admin early avoids the situation.
+  the quickstart documents the manual database steps. They change the address in one
+  transaction, invalidate that person's links, link codes and sessions, and record a People
+  action without either address. This feature adds no recovery route or command. Promoting a
+  second admin early avoids the situation.
 - Admin pages are built for the laptop layout first (handoff §11 step 9); this feature delivers
   working People pages, not their final visual design.

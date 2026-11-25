@@ -63,7 +63,7 @@ People and You screens are complete, clear, consistent and measurable before
 - [x] CHK034 After an invite's email fails (edge case), is the state defined: does the person exist as "invited" with a usable link, so that retry means "resend"? [Clarity, Spec §Edge Cases, §FR-029] — the person stays invited with a usable link, so retry means resend (contracts/http.md).
 - [x] CHK035 Is it specified whether a failed sign-in email counts toward the per-address and per-client limits? [Gap, Spec §FR-021, §Edge Cases] — accepted requests count whether or not the send succeeds (research R7).
 - [x] CHK036 Is the first-admin bootstrap's behaviour defined when its invite email fails at startup (retry, log only, recovery by sign-in link)? [Gap, Spec §FR-033] — logged; recovery with an ordinary sign-in link (FR-033, research R11).
-- [x] CHK037 Is the bootstrap's behaviour defined when `INITIAL_ADMIN_EMAIL` already belongs to a non-admin person? [Edge Case, Gap, Spec §FR-033, §FR-002] — can't arise: every person is invited by an admin, and admins are never removed.
+- [x] CHK037 Is the bootstrap's behaviour defined when `INITIAL_ADMIN_EMAIL` already belongs to a non-admin person? [Edge Case, Gap, Spec §FR-033, §FR-002] — can't arise: before any admin has signed in, nobody can invite, so the only person is the pending first admin; once an admin has signed in, the startup step does nothing (FR-033).
 - [x] CHK038 Is recovery defined for a typo in `INITIAL_ADMIN_EMAIL`, given that startup ignores the setting once any admin exists "in any status"? [Gap, Recovery, Spec §FR-033] — spec: FR-033 moves the pending invite until an admin signs in.
 - [x] CHK039 Is recovery defined for losing access to the only admin account, for example a lost mailbox, since self-demotion is impossible and no other admin exists? [Gap, Recovery, Spec §FR-030] — spec Assumptions: host access with the manual steps in the quickstart.
 - [x] CHK040 Are FR-036 to FR-038's startup refusals stated for the worker as well as the api, or explicitly api-only? [Clarity, Spec §FR-036, §FR-038] — the worker needs SESSION_SECRET; SMTP and the first admin are api only (research R8).
@@ -93,7 +93,7 @@ People and You screens are complete, clear, consistent and measurable before
 - `/speckit-implement` reads checklist checkbox state as a gate and must not modify markers
 - `checklists/requirements.md` has a separate built-in lifecycle maintained by `/speckit-specify` and `/speckit-clarify`
 - Several items are settled in the plan rather than the spec (for example CHK014, CHK015, CHK017, CHK019, CHK023, CHK025 and CHK031 are answered in research.md R2, R4, R7 and contracts/http.md). The reviewer decides whether a plan-level answer is enough or the spec should say it.
-- CHK020 is the open point already raised in plan.md (research R14).
+- CHK020, first raised as an open point in plan.md, was decided on 2026-11-25 (research R14, spec Assumptions).
 - **Review, 2026-11-25**: Antn went through every item with the agent and decided CHK013, 014,
   015, 020, 021, 027, 038, 039, 046 and 047, which led to the spec changes listed in its
   Clarifications. Antn accepted the plan's answers for the rest and asked the agent to record the
