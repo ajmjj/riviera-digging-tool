@@ -42,6 +42,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: Should 002 already allow for a read-only role, so the shop owner could see the staff purchases log without being an admin? → A: No. Two roles only, admin and staff; any later role is a change to 002's role model.
 - Q: How should the first admin account (Antn's) be created on a fresh install, when there is no admin yet to send the invite? → A: A one-off host-machine command takes a name and email, creates the admin and sends an invite link; it refuses once any admin exists.
 - Q: Should an admin be able to reactivate a deactivated person, or change a person's email address? → A: Admins can reactivate (fresh invite link, same staff ID and history); email changes stay out of scope.
+- Q: What should an admin be able to see and do about other people's signed-in devices? → A: Admins see each person's device count and can "sign out everywhere" without deactivating, no device names; shown only in the laptop (computer) layout, not on phones.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -136,6 +137,8 @@ success respectively.
 On the People pages, the admin sees everyone with their role, status (invited, active,
 deactivated) and when they were last seen. The admin can invite someone, resend or cancel a
 pending invite, deactivate an account, reactivate a deactivated one, and make someone an admin.
+On the laptop, the admin also sees how many devices each person is signed in on and can sign
+them out everywhere without deactivating them.
 
 **Why this priority**: Needed to run the team after launch, but Story 1's invite is enough to
 onboard the first colleagues.
@@ -161,6 +164,10 @@ person's status, their sessions, and the emails captured.
 6. **Given** a deactivated person, **When** the admin reactivates them, **Then** they get a fresh
    invite email, and once they sign in from it they are active again under the same staff ID,
    with everything they recorded before.
+7. **Given** a staff member signed in on two devices, **When** the admin, in the laptop layout,
+   chooses "sign out everywhere" for them, **Then** both devices answer 401 at their next request,
+   the person stays active and can sign in again, and the admin saw only "2 devices", never the
+   device names.
 
 ---
 
@@ -212,7 +219,8 @@ other out, and check its next request answers 401.
 3. **Given** they sign out on the current device, **When** they reload, **Then** they see the
    sign-in screen.
 4. **Given** any person, admin included, **When** they ask for another person's devices,
-   **Then** they cannot see or change them.
+   **Then** they cannot see or change them, apart from the admin's device count and "sign out
+   everywhere" (FR-028).
 
 ---
 
@@ -341,7 +349,8 @@ other out, and check its next request answers 401.
   role or a deactivation applies from the person's next request.
 - **FR-026**: Per-person data MUST be reachable only by its owner. Every request MUST carry the
   acting person's pseudonymous staff ID, and every read or change of per-person data MUST be
-  scoped to it. The admin role MUST NOT widen this scope. In this feature the rule MUST be
+  scoped to it. The admin role MUST NOT widen this scope, with one exception: the device count
+  and "sign out everywhere" of FR-028. In this feature the rule MUST be
   enforced and tested on devices, sessions and push subscriptions; later features that add
   verdicts, piles and Discogs accounts MUST use the same scoping and add their own tests.
 - **FR-027**: Routes MUST NOT return a Discogs token, any person's own included, and MUST NOT
@@ -352,7 +361,13 @@ other out, and check its next request answers 401.
 
 - **FR-028**: Admins MUST be able to see every person with name, email address, role, status
   (invited, active, deactivated), when they were invited, and when they were last seen on any
-  device. They MUST NOT see anyone's individual devices, sessions or push subscriptions.
+  device. For each other person, admins MUST also be able to see how many devices that person is
+  signed in on, and to "sign out everywhere": end all that person's sessions and remove their
+  devices and push subscriptions without deactivating them. Admins MUST NOT see anyone else's
+  device names, individual devices, sessions or push subscriptions. The device count and the
+  "sign out everywhere" action MUST appear only in the laptop layout of the People pages (as on
+  the design canvas, checked at 1440×900) and MUST NOT appear in the phone layout (checked at
+  390×844). The server enforces the admin role for both (FR-024); it doesn't tell layouts apart.
 - **FR-029**: Admins MUST be able to resend a pending invite (FR-008 applies) and cancel a
   pending invite (its links stop working at once). Neither action applies to an active or
   deactivated person.
@@ -369,7 +384,8 @@ other out, and check its next request answers 401.
   sends a fresh invite link (FR-002, FR-005), keeping the same staff ID, role and everything
   recorded under it; signing in from that link makes them active again (FR-010). Cancelling such
   an invite (FR-029) returns the person to "deactivated" rather than removing them.
-- **FR-032**: Every People action (invite, resend, cancel, deactivate, reactivate, role change) MUST be
+- **FR-032**: Every People action (invite, resend, cancel, deactivate, reactivate, role change,
+  sign out everywhere) MUST be
   recorded with who did it, to whom, what, and when, identified by staff IDs.
 - **FR-033**: There MUST be a one-off command, run on the host machine only and not reachable over
   HTTP, that takes a name and email address, creates that person as an invited admin and sends
