@@ -64,6 +64,55 @@ export function findSuppressions(
   return violations;
 }
 
+/**
+ * Image-scan exceptions (constitution Quality Gates, Trivy): Trivy ignore files, and the options
+ * that point Trivy at one or skip findings. Unlike the suppressions above these count under ci/
+ * too, since that is where the CI scan and its exception files live (PR #52). Only the guard's own
+ * source and test may name the options without being flagged.
+ */
+const SCAN_EXCEPTION_FILES: readonly string[] = [
+  "**/.trivyignore",
+  "**/.trivyignore.*",
+  "ci/trivy-exceptions/**",
+];
+const SCAN_EXCEPTION_OPTION =
+  /--ignorefile\b|--ignore-policy\b|--skip-(?:files|dirs)\b|\bTRIVY_(?:IGNOREFILE|IGNORE_POLICY|SKIP_FILES|SKIP_DIRS)\b/;
+const SCAN_EXCEPTION_SELF: readonly string[] = ["ci/lib/guard.ts", "ci/test/guard.test.ts"];
+
+/** Added or changed Trivy exceptions in a diff: one finding per ignore file, and per option line. */
+export function findScanExceptions(files: readonly FileDiff[]): Violation[] {
+  const violations: Violation[] = [];
+  for (const file of files) {
+    const first = file.added[0];
+    if (file.deleted || first === undefined) {
+      continue;
+    }
+    if (matchesAny(file.file, SCAN_EXCEPTION_FILES)) {
+      violations.push({
+        file: file.file,
+        line: first.line,
+        rule: "scan-exception",
+        text: "Trivy ignore file added or changed",
+      });
+      continue;
+    }
+    if (matchesAny(file.file, SCAN_EXCEPTION_SELF)) {
+      continue;
+    }
+    for (const added of file.added) {
+      if (SCAN_EXCEPTION_OPTION.test(added.text)) {
+        violations.push({
+          file: file.file,
+          line: added.line,
+          rule: "scan-exception",
+          text: added.text.trim(),
+        });
+      }
+    }
+  }
+  return violations;
+}
+
 function leaves(value: unknown, path: string, out: Map<string, unknown>): void {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     for (const [key, child] of Object.entries(value)) {

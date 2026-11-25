@@ -7,6 +7,8 @@
 # the exact image reference on its `# image:` line. A file with a `# from: <Dockerfile> <base>`
 # line also applies only while that Dockerfile still has `FROM <base>`. Bumping a pin or a base
 # therefore drops the exception instead of inheriting it. Every other image is scanned with none.
+# An exception file that matches no image is reported as a warning, so a stale one is visible.
+# If the image list can't be read or is empty, the scan fails rather than passing on nothing.
 set -euo pipefail
 trivy=${TRIVY:-/tmp/trivy}
 cd "$(dirname "$0")/.."
@@ -26,6 +28,24 @@ ignorefile_for() {
   done
 }
 
+if ! listed=$(docker compose --profile dev --profile observability config --images); then
+  echo "::error::docker compose could not list the stack's images; nothing was scanned"
+  exit 1
+fi
+images=$(sort -u <<<"$listed")
+if [ -z "$images" ]; then
+  echo "::error::docker compose listed no images; nothing was scanned"
+  exit 1
+fi
+
+for file in ci/trivy-exceptions/*.yaml; do
+  [ -e "$file" ] || continue
+  ref=$(sed -n 's/^# image: //p' "$file")
+  if ! grep -qxF "$ref" <<<"$images"; then
+    echo "::warning::$file names ${ref:-no image} on its # image: line, which is not in the stack"
+  fi
+done
+
 rc=0
 while read -r image; do
   ignore=()
@@ -36,5 +56,5 @@ while read -r image; do
   fi
   "$trivy" image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --no-progress \
     "${ignore[@]}" "$image" || rc=1
-done < <(docker compose --profile dev --profile observability config --images | sort -u)
+done <<<"$images"
 exit "$rc"

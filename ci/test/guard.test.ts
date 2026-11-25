@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FileDiff } from "../lib/diff.ts";
-import { findSuppressions, loweredThresholds } from "../lib/guard.ts";
+import { findScanExceptions, findSuppressions, loweredThresholds } from "../lib/guard.ts";
 
 function file(path: string, ...lines: string[]): FileDiff {
   return { file: path, deleted: false, added: lines.map((text, i) => ({ line: i + 1, text })) };
@@ -88,6 +88,46 @@ describe("findSuppressions", () => {
   it("accepts a custom exemption list", () => {
     const marker = `${dot("it", "skip")}("x")`;
     expect(findSuppressions([file("ci/x.ts", marker)], [])).toHaveLength(1);
+  });
+});
+
+describe("findScanExceptions", () => {
+  it.each([
+    [".trivyignore"],
+    ["docker/.trivyignore"],
+    [".trivyignore.yaml"],
+    ["ci/trivy-exceptions/grafana.yaml"],
+    ["ci/trivy-exceptions/new-image.yaml"],
+  ])("flags an added or changed Trivy ignore file, also under ci/: %s", (path) => {
+    expect(findScanExceptions([file(path, "CVE-2026-0001", "CVE-2026-0002")])).toEqual([
+      { file: path, line: 1, rule: "scan-exception", text: "Trivy ignore file added or changed" },
+    ]);
+  });
+
+  it.each([
+    ['trivy image --ignorefile x.yaml "$image"'],
+    ["trivy image --skip-files /usr/bin/grafana img"],
+    ["trivy image --skip-dirs /usr/share img"],
+    ["trivy image --ignore-policy p.rego img"],
+    ["TRIVY_IGNOREFILE=x.yaml trivy image img"],
+    ["  TRIVY_SKIP_DIRS: /usr"],
+  ])("flags an added line that points Trivy at exceptions, also under ci/: %s", (text) => {
+    expect(findScanExceptions([file(".github/workflows/ci.yml", "ok", text)])).toEqual([
+      { file: ".github/workflows/ci.yml", line: 2, rule: "scan-exception", text: text.trim() },
+    ]);
+    expect(findScanExceptions([file("ci/trivy-scan.sh", text)])).toHaveLength(1);
+  });
+
+  it("accepts plain scans, deleted ignore files, files with no added lines and the guard itself", () => {
+    expect(
+      findScanExceptions([
+        file("ci/trivy-scan.sh", "trivy image --exit-code 1 --severity HIGH,CRITICAL img"),
+        { file: "ci/trivy-exceptions/grafana.yaml", deleted: true, added: [] },
+        { file: ".trivyignore", deleted: false, added: [] },
+        file("ci/lib/guard.ts", "const OPTION = /--ignorefile/;"),
+        file("ci/test/guard.test.ts", "TRIVY_IGNOREFILE=x"),
+      ]),
+    ).toEqual([]);
   });
 });
 
