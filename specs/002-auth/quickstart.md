@@ -83,10 +83,33 @@ captured or sent; the old link no longer works (FR-033).
 There is no route or command for this in 002 (spec Assumptions); it needs the host. Promote a
 second admin early to avoid it. On the host:
 
-1. `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"`
-2. `UPDATE staff SET email = lower(btrim('new-address@example.org')) WHERE role = 'admin' AND status = 'active' AND id = '<staff id>';`
-   (find the ID with `SELECT id, role, status FROM staff WHERE role = 'admin';`)
-3. Request a sign-in link for the new address on the sign-in screen.
+1. Open a database shell:
+
+   ```bash
+   docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+   ```
+
+2. Find the admin's staff ID with `SELECT id, role, status FROM staff WHERE role = 'admin';`.
+3. Run this as one transaction, with the ID and the new address filled in. It changes the address
+   (normalized as the api does it), invalidates that person's links, link code and sessions
+   (deleting the devices removes their sessions), and records the change without either
+   address:
+
+   ```sql
+   BEGIN;
+   UPDATE staff SET email = lower(btrim(normalize('new-address@example.org', NFC)))
+     WHERE id = '<staff id>' AND role = 'admin' AND status = 'active';
+   DELETE FROM magic_link WHERE staff_id = '<staff id>';
+   DELETE FROM link_code WHERE staff_id = '<staff id>';
+   DELETE FROM device WHERE staff_id = '<staff id>';
+   INSERT INTO people_action (actor_staff_id, target_staff_id, action)
+     VALUES (NULL, '<staff id>', 'host_readdress');
+   COMMIT;
+   ```
+
+   If the `UPDATE` reports `UPDATE 0`, run `ROLLBACK;` and check the ID.
+
+4. Request a sign-in link for the new address on the sign-in screen.
 
 ## Emergency sign-out
 
