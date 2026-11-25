@@ -37,6 +37,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: How long should a sign-in link stay valid, and how long should an invite link stay valid? → A: Sign-in link 15 minutes; invite link 7 days.
 - Q: How long should a session last, after how much inactivity should it end, and should there be a "remember me" choice? → A: Sessions last 90 days, end after 30 days idle, no remember-me.
 - Q: What limits should apply to requests for sign-in links and to attempts at entering link codes? → A: Link requests 3 per email address per 15 min and 20 per client per hour; a code dies after 5 wrong tries; 10 wrong tries per client per 10 min; no tool-wide cap.
+- Q: Which email service and sender address should send the sign-in and invite emails? → A: IONOS SMTP, sending from a mailbox on `rivierarecords.de` (for example `dig@rivierarecords.de`).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -368,16 +369,19 @@ other out, and check its next request answers 401.
   contain the session secret, SMTP credentials, stored token or session hashes, or any other
   server-side secret. Session identifiers MUST reach the browser only in the cookie of FR-012.
 - **FR-036**: The session secret and SMTP credentials MUST come from `.env`
-  (`SESSION_SECRET`, `SMTP_URL`), never from committed files. The api MUST refuse to start in
+  (`SESSION_SECRET`, `SMTP_URL`), never from committed files; the sender address comes from
+  `EMAIL_FROM` (FR-037). The api MUST refuse to start in
   production if the session secret is missing or shorter than 32 bytes, or if no SMTP transport
   is configured, and MUST say which setting is missing without printing any value.
 
 **Email**
 
 - **FR-037**: Email MUST be sent through one email interface with interchangeable transports.
-  Production MUST use an SMTP transport for [NEEDS CLARIFICATION: which SMTP service and sender
-  address send the sign-in links (handoff §14)?]. Development and CI MUST use a capture transport
-  that stores messages where tests and developers can read them and sends nothing.
+  Production MUST use an SMTP transport to IONOS SMTP, sending from a mailbox on
+  `rivierarecords.de` (for example `dig@rivierarecords.de`) given by the `.env` setting
+  `EMAIL_FROM`; the api MUST refuse to start in production if `EMAIL_FROM` is missing or not an
+  address on `rivierarecords.de`. Development and CI MUST use a capture transport that stores
+  messages where tests and developers can read them and sends nothing.
 - **FR-038**: The api MUST refuse to start with the SMTP transport unless the deployment
   environment is production, so development and CI can never send real email.
 - **FR-039**: Sign-in and invite emails MUST contain the link, the person's name, and how long
@@ -452,5 +456,7 @@ other out, and check its next request answers 401.
   tool's own role checks must hold without it.
 - The public domain isn't chosen yet. Everything is driven by `APP_URL`, which locally is
   `http://localhost:8080`.
+- The IONOS mailbox used as `EMAIL_FROM`, and its SMTP credentials, are set up by Antn before
+  launch. Its name is a deployment choice, not a spec change.
 - Admin pages are built for the laptop layout first (handoff §11 step 9); this feature delivers
   working People pages, not their final visual design.
