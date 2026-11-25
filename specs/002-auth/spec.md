@@ -362,9 +362,11 @@ other out, and check its next request answers 401.
   and "sign out everywhere" of FR-028. In this feature the rule MUST be
   enforced and tested on devices, sessions and push subscriptions; later features that add
   verdicts, piles and Discogs accounts MUST use the same scoping and add their own tests.
-- **FR-027**: Routes MUST NOT return a Discogs token, any person's own included, and MUST NOT
-  let anyone change another person's verdicts. (Verdicts and Discogs accounts arrive in
-  later features; this requirement binds them, and their specs MUST each name a test for it.)
+- **FR-027**: No route's response MUST contain a Discogs token, a session or CSRF secret, a
+  sign-in token or a token hash, any person's own included. CI MUST check this by calling every
+  served route, as each role, and scanning the responses for secret-named fields and
+  secret-shaped values. (Discogs accounts and verdicts arrive in later features; their specs
+  extend this scan and add their own isolation tests, see Assumptions.)
 
 **People administration**
 
@@ -407,7 +409,8 @@ other out, and check its next request answers 401.
   carry a valid CSRF token bound to the browser's session (or, before sign-in, to a pre-sign-in
   token), and MUST come from the `APP_URL` origin. Otherwise it MUST answer 403 and change
   nothing. This MUST apply to the sign-in routes too. GET and HEAD requests MUST NOT change
-  state. CI MUST check every state-changing route, from a route list checked against the routes
+  state, apart from session bookkeeping: updating last-seen times (FR-015) and removing an ended
+  session and its device (FR-013). CI MUST check every state-changing route, from a route list checked against the routes
   the api actually serves.
 - **FR-035**: What is sent to the browser (responses, pages, the built frontend bundle) MUST NOT
   contain the session secret, SMTP credentials, stored token or session hashes, or any other
@@ -495,7 +498,9 @@ other out, and check its next request answers 401.
 - The team list (names, current box, heard count) that every staff member sees belongs to a later
   feature; this feature exposes no other person's data to staff.
 - Verdicts, piles and Discogs accounts don't exist yet. FR-026 and FR-027 set the rule they must
-  follow and how it is tested; each owning feature proves it for its own data.
+  follow and how it is tested; each owning feature proves it for its own data. In particular,
+  the specs that add verdicts and Discogs accounts must require that nobody can change another
+  person's verdicts and that no route returns a Discogs token (constitution, Principle VIII).
 - Cloudflare Access in front of `/admin` (handoff §12) is optional and outside this feature; the
   tool's own role checks must hold without it.
 - The public domain isn't chosen yet. Everything is driven by `APP_URL`, which locally is
