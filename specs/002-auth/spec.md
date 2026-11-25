@@ -48,6 +48,17 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: With the per-code counter dropped, should wrong link-code guesses get a tool-wide cap? → A: No; only 10 wrong tries per client per 10 min.
 - Q: When an admin cancels the invite of someone who has never signed in, what happens to their record, and can the address be invited again? → A: The record is removed; the action log keeps the staff ID without the address; the address can be invited again as a new person.
 
+### Session 2026-11-25 (security checklist review)
+
+- Q: Does "Antn as the only admin" in the constitution's delivery order forbid promoting others in 002? → A: No. It means at launch; FR-022 and FR-030 stand, and the constitution is not amended.
+- Q: Must production use HTTPS? → A: Yes, unless `APP_URL` is `localhost` or `127.0.0.1` (FR-036).
+- Q: Which routes work without a session, and does CSRF or the session check answer first? → A: Getting a CSRF token and checking a link join the sign-in routes; the CSRF check comes first (FR-023).
+- Q: Must pages and responses carry browser protections? → A: Yes: no framing by other sites, no referrer, a same-origin content security policy (FR-042).
+- Q: May client IP addresses and User-Agent strings appear in logs? → A: No, in the api's telemetry and in the proxy's access log (FR-040).
+- Q: How is a typo in `INITIAL_ADMIN_EMAIL` recovered? → A: Until an admin has signed in, startup moves the pending first-admin invite to the configured address (FR-033).
+- Q: How is the only admin's lost mailbox recovered? → A: With host access, by documented manual steps; no route or command in 002 (Assumptions).
+- Q: Which People actions exist on a phone, and do they ask for confirmation? → A: None: the People pages are laptop only. Deactivate, cancel, sign out everywhere and role changes ask for confirmation naming the person (FR-028).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Accept an invite and sign in for the first time (Priority: P1)
@@ -352,9 +363,11 @@ other out, and check its next request answers 401.
   role. At launch, Antn is the only admin. A further role (for example read-only access to the
   staff purchases log for the shop owner, handoff §14) is out of scope and would be a change to
   this spec.
-- **FR-023**: Every route MUST require a valid session except the sign-in routes (request a
-  link, confirm a link, enter a link code) and the health endpoints. A request without a valid
-  session MUST answer 401.
+- **FR-023**: Every route MUST require a valid session except the sign-in routes (get a CSRF
+  token, request a link, check a link without using it, confirm a link, enter a link code) and
+  the health endpoints. A request without a valid session MUST answer 401. The CSRF check of
+  FR-034 comes first: a state-changing request with a missing or wrong CSRF token or a foreign
+  origin answers 403, whether or not it has a valid session.
 - **FR-024**: Every admin route MUST answer 403 to a signed-in staff member and MUST change
   nothing. CI MUST check this for every admin route, using a list of admin routes that is
   checked against the routes the api actually serves, so that a new admin route can't escape the
@@ -380,10 +393,13 @@ other out, and check its next request answers 401.
   device. For each other person, admins MUST also be able to see how many devices that person is
   signed in on, and to "sign out everywhere": end all that person's sessions and remove their
   devices and push subscriptions without deactivating them. Admins MUST NOT see anyone else's
-  device names, individual devices, sessions or push subscriptions. The device count and the
-  "sign out everywhere" action MUST appear only in the laptop layout of the People pages (as on
-  the design canvas, checked at 1440×900) and MUST NOT appear in the phone layout (checked at
-  390×844). The server enforces the admin role for both (FR-024); it doesn't tell layouts apart.
+  device names, individual devices, sessions or push subscriptions. The People pages, with
+  the device count, "sign out everywhere" and every other People action, MUST appear only in the
+  laptop layout (checked at 1440×900). In the phone layout (checked at 390×844) an admin who
+  opens them MUST see only a note to use a computer, with no list and no actions. Before
+  deactivating someone, cancelling an invite, signing someone out everywhere or changing a role,
+  the page MUST ask for confirmation naming the person. The server enforces the admin role for
+  every People route (FR-024); it doesn't tell layouts apart.
 - **FR-029**: Admins MUST be able to resend a pending invite (FR-008 applies) and cancel a
   pending invite (its links stop working at once). Neither action applies to an active or
   deactivated person. Cancelling the invite of someone who has never signed in MUST remove their
@@ -404,15 +420,21 @@ other out, and check its next request answers 401.
   recorded under it; signing in from that link makes them active again (FR-010). Cancelling such
   an invite (FR-029) returns the person to "deactivated" rather than removing them.
 - **FR-032**: Every People action (invite, resend, cancel, deactivate, reactivate, role change,
-  sign out everywhere) MUST be
+  sign out everywhere, and the first-admin address change of FR-033) MUST be
   recorded with who did it, to whom, what, and when, identified by staff IDs.
 - **FR-033**: The first admin MUST come from the `.env` setting `INITIAL_ADMIN_EMAIL` (for this
   install, Antn's address; it is set only in `.env` and never committed, and `.env.example` names
   the setting with an empty value). The admin's name comes from the optional `INITIAL_ADMIN_NAME`,
   or else from the part of the address before the `@`. When the api starts and no admin exists in any status,
   it MUST create that person as an invited admin and send them an invite link (FR-002, FR-005),
-  so starting a fresh install emails the first admin. When any admin exists, startup MUST
-  change nothing and send nothing, whatever the setting says. The setting MUST NOT be reachable
+  so starting a fresh install emails the first admin. While no admin has ever completed a
+  sign-in and the setting names a different address from the pending first admin's, startup
+  MUST move that invite to the configured address: same staff ID, the new address and name (as
+  above), every earlier link invalidated, a fresh invite sent, and the change recorded as a
+  People action without either address. This is the only way an address changes in this
+  feature. When the setting names the same address, startup changes nothing and sends nothing.
+  Once any admin has completed a sign-in, startup MUST change nothing and send nothing,
+  whatever the setting says. The setting MUST NOT be reachable
   over HTTP, and the api MUST NOT log or print the address, the link or the token. If no admin
   exists and the setting is empty, the api MUST still start and MUST log, without any address,
   that no first admin is configured. A first admin whose invite has expired gets in with an
@@ -434,7 +456,8 @@ other out, and check its next request answers 401.
   (`SESSION_SECRET`, `SMTP_URL`), never from committed files; the sender address comes from
   `EMAIL_FROM` (FR-037) and the first admin's address from `INITIAL_ADMIN_EMAIL` (FR-033). The api MUST refuse to start in
   production if the session secret is missing or shorter than 32 bytes, or if no SMTP transport
-  is configured, and MUST say which setting is missing without printing any value.
+  is configured, or if `APP_URL` uses plain HTTP on any host other than `localhost` or
+  `127.0.0.1`, and MUST say which setting is missing or wrong without printing any value.
 
 **Email**
 
@@ -452,13 +475,22 @@ other out, and check its next request answers 401.
 **Logs and telemetry**
 
 - **FR-040**: Logs, span attributes and metric labels MUST NOT contain email addresses, names,
-  sign-in tokens or links, link codes, session identifiers, CSRF tokens or push subscription
-  data. They MUST identify people only by pseudonymous staff ID (001/FR-004) and MUST go through
+  sign-in tokens or links, link codes, session identifiers, CSRF tokens, push subscription
+  data, client IP addresses or User-Agent strings. The proxy's access log MUST NOT contain
+  client IP addresses or User-Agent strings either. They MUST identify people only by pseudonymous staff ID (001/FR-004) and MUST go through
   001's redaction (001/FR-005). Tests MUST plant each of these values in auth flows and check
   that none appears in emitted telemetry.
 - **FR-041**: Auth MUST emit structured logs and metrics for link requests, sign-ins, link-code
   attempts, rate-limit refusals, CSRF and role refusals, emails sent, and People actions, each by
   outcome, with bounded labels only (001/FR-018).
+
+**Browser protections**
+
+- **FR-042**: Every page and api response MUST forbid being shown in a frame by another site,
+  MUST send no referrer to other sites, and MUST carry a content security policy that allows
+  scripts, styles and connections only from the tool's own origin, so another site can't trick a
+  person into confirming a sign-in inside a hidden frame. CI MUST check this on every served
+  page and route.
 
 ### Key Entities
 
@@ -522,5 +554,11 @@ other out, and check its next request answers 401.
   `http://localhost:8080`.
 - The IONOS mailbox used as `EMAIL_FROM`, and its SMTP credentials, are set up by Antn before
   launch. Its name is a deployment choice, not a spec change.
+- "Antn as the only admin" in the constitution's delivery order means at launch: admins may
+  make others admins (FR-030). Antn confirmed this reading on 2026-11-25 without amending the
+  constitution.
+- If the only admin loses access to their mailbox, recovery needs access to the host machine:
+  the quickstart documents the manual database steps. This feature adds no recovery route or
+  command. Promoting a second admin early avoids the situation.
 - Admin pages are built for the laptop layout first (handoff §11 step 9); this feature delivers
   working People pages, not their final visual design.

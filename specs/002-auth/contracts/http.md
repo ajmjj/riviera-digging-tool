@@ -11,15 +11,18 @@ for every route (`X-Request-Id`, `traceparent`) still apply. Bodies are JSON.
 | Session | cookie `__Host-rd_session` (HTTPS) / `rd_session` (HTTP), research R3 | FR-011, FR-012 |
 | CSRF | non-GET/HEAD/OPTIONS: `X-CSRF-Token` valid for the session or `rd_pre`, **and** `Origin` = `APP_URL` origin (research R2) | FR-034 |
 | Client key | `X-Riviera-Client-Ip`, written only by the proxy (research R1) | FR-020, FR-021 |
+| Browser protections | CSP, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `nosniff` on every response (research R15) | FR-042 |
 
 **Answers, in order of the checks**:
 
-1. CSRF fails: `403 {"error":"forbidden"}`.
+1. CSRF fails: `403 {"error":"forbidden"}`, whether or not a session exists (FR-023).
 2. No live session on a `staff` or `admin` route: `401 {"error":"sign_in_required"}`.
 3. A staff member on an `admin` route: `403 {"error":"forbidden"}`.
 
 None of these changes anything. Rate limited: `429 {"error":"rate_limited","retryAfterSeconds":n}`
 plus `Retry-After`. Bad input: `400 {"error":"invalid"}`, which never echoes the value.
+
+Database unreachable: `503 {"error":"unavailable"}`.
 
 ## Sign-in routes (`public`)
 

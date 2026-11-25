@@ -12,79 +12,79 @@ People and You screens are complete, clear, consistent and measurable before
 
 ## Links and codes: completeness and clarity
 
-- [ ] CHK001 Is the 128-bit minimum for link tokens (FR-004) matched by a stated strength rule for the 6-digit link code, or is its weakness explicitly accepted, given that only the per-client limit protects it? [Clarity, Spec §FR-018, §FR-020, Assumptions]
-- [ ] CHK002 Is it specified whether a sign-in link is refused when its person was deactivated *and later reactivated* between issue and use? [Edge Case, Spec §FR-008, §FR-031]
-- [ ] CHK003 Does US1-3 ("when anyone opens the same link again, sign-in is refused") say whether the refusal comes on opening or only on pressing Confirm, consistently with FR-007? [Clarity, Spec §US1, §FR-007]
-- [ ] CHK004 Is it defined who may see a link code once issued (only the requesting device, re-viewable, shown once)? [Gap, Spec §FR-018]
-- [ ] CHK005 Is a limit on how often a signed-in person may *request* link codes or sign-in links for themselves specified or explicitly excluded? [Gap, Spec §FR-018, §FR-021]
-- [ ] CHK006 Is "altered by a single character… or comes from a different deployment" defined precisely enough to test, for example a link built for another `APP_URL`? [Clarity, Spec §Edge Cases]
+- [x] CHK001 Is the 128-bit minimum for link tokens (FR-004) matched by a stated strength rule for the 6-digit link code, or is its weakness explicitly accepted, given that only the per-client limit protects it? [Clarity, Spec §FR-018, §FR-020, Assumptions] — accepted in Clarifications and Assumptions (per-client limit only).
+- [x] CHK002 Is it specified whether a sign-in link is refused when its person was deactivated *and later reactivated* between issue and use? [Edge Case, Spec §FR-008, §FR-031] — deactivation deletes every link (FR-031), so an old link can't survive reactivation.
+- [x] CHK003 Does US1-3 ("when anyone opens the same link again, sign-in is refused") say whether the refusal comes on opening or only on pressing Confirm, consistently with FR-007? [Clarity, Spec §US1, §FR-007] — refusal on opening through the inspect step (research R6, contracts/http.md).
+- [x] CHK004 Is it defined who may see a link code once issued (only the requesting device, re-viewable, shown once)? [Gap, Spec §FR-018] — shown once on the requesting device (research R16).
+- [x] CHK005 Is a limit on how often a signed-in person may *request* link codes or sign-in links for themselves specified or explicitly excluded? [Gap, Spec §FR-018, §FR-021] — excluded for a team this size (research R16).
+- [x] CHK006 Is "altered by a single character… or comes from a different deployment" defined precisely enough to test, for example a link built for another `APP_URL`? [Clarity, Spec §Edge Cases] — tokens are hashed with a per-install key (research R4), so a link from another deployment is refused like any altered link.
 
 ## Sessions and cookies
 
-- [ ] CHK007 Does FR-011 say whether the pre-sign-in token of FR-034 counts as a "session identifier the browser presented before sign-in" that must be discarded? [Ambiguity, Spec §FR-011, §FR-034]
-- [ ] CHK008 Is the session cookie's own lifetime (persistent for 90 days, or ending when the browser closes) specified? [Gap, Spec §FR-012, §FR-013]
-- [ ] CHK009 Is it specified whether a role change (staff → admin) must issue a new session identifier, as a privilege change, or is fresh reading per request (FR-025) stated as enough? [Gap, Spec §FR-025, §FR-011]
-- [ ] CHK010 Is a maximum number of devices or sessions per person specified or explicitly excluded? [Gap, Spec §FR-014]
-- [ ] CHK011 Is "accurate to within 5 minutes" (FR-015) consistent with how admins' "last seen on any device" (FR-028) is defined? [Consistency, Spec §FR-015, §FR-028]
-- [ ] CHK012 Is the effect of changing `SESSION_SECRET` on existing sessions, links and codes stated as a requirement (or as an intended emergency sign-out)? [Gap, Spec §FR-036]
-- [ ] CHK013 Is HTTPS required for `APP_URL` in production, or is the Secure flag only conditional (FR-012) with plain HTTP allowed in production? [Gap, Spec §FR-012, Assumptions]
+- [x] CHK007 Does FR-011 say whether the pre-sign-in token of FR-034 counts as a "session identifier the browser presented before sign-in" that must be discarded? [Ambiguity, Spec §FR-011, §FR-034] — the pre-sign-in cookie is cleared at sign-in (research R2).
+- [x] CHK008 Is the session cookie's own lifetime (persistent for 90 days, or ending when the browser closes) specified? [Gap, Spec §FR-012, §FR-013] — 90-day persistent cookie (research R3).
+- [x] CHK009 Is it specified whether a role change (staff → admin) must issue a new session identifier, as a privilege change, or is fresh reading per request (FR-025) stated as enough? [Gap, Spec §FR-025, §FR-011] — not required: role and status are read on every request (FR-025, research R5).
+- [x] CHK010 Is a maximum number of devices or sessions per person specified or explicitly excluded? [Gap, Spec §FR-014] — excluded for a team this size (research R16).
+- [x] CHK011 Is "accurate to within 5 minutes" (FR-015) consistent with how admins' "last seen on any device" (FR-028) is defined? [Consistency, Spec §FR-015, §FR-028] — "last seen on any device" is the newest device's last-seen time (FR-015, FR-028).
+- [x] CHK012 Is the effect of changing `SESSION_SECRET` on existing sessions, links and codes stated as a requirement (or as an intended emergency sign-out)? [Gap, Spec §FR-036] — changing it ends every session, link and code (research R4, quickstart).
+- [x] CHK013 Is HTTPS required for `APP_URL` in production, or is the Secure flag only conditional (FR-012) with plain HTTP allowed in production? [Gap, Spec §FR-012, Assumptions] — spec: FR-036 refuses plain HTTP in production except localhost/127.0.0.1.
 
 ## Access control and CSRF consistency
 
-- [ ] CHK014 Does FR-023's list of session-free routes ("request a link, confirm a link, enter a link code") cover the routes needed before sign-in to obtain a CSRF token and to inspect a link without spending it? [Conflict, Spec §FR-023, §FR-034, §FR-007]
-- [ ] CHK015 Is the precedence between 401 (FR-023) and 403 (FR-034) defined for a signed-out, state-changing request that also lacks a CSRF token? [Conflict, Spec §FR-023, §FR-034]
-- [ ] CHK016 Is it specified whether `OPTIONS` requests need a session (FR-023 names only sign-in and health routes as exempt)? [Clarity, Spec §FR-023, §FR-034]
-- [ ] CHK017 Is "comes from the `APP_URL` origin" defined for requests that carry no `Origin` header? [Ambiguity, Spec §FR-034]
-- [ ] CHK018 Does FR-026's rule apply to the People action record (can a staff member read actions about themselves)? [Coverage, Spec §FR-026, §FR-032]
-- [ ] CHK019 Is the answer for another person's device (403 or 404, or "not distinguishable from nonexistent") specified? [Gap, Spec §US6-4, §FR-026]
-- [ ] CHK020 Is the constitution's "Antn as the only admin" (delivery order, 002) reconciled with FR-022's "at launch" and FR-030's promotion of others? [Conflict, Constitution §Delivery order, Spec §FR-022, §FR-030]
-- [ ] CHK021 Are response-security requirements (frame embedding, content security, referrer policy) specified for the sign-in and confirm pages, which handle a token in the URL? [Gap, Spec §FR-007, §FR-035]
+- [x] CHK014 Does FR-023's list of session-free routes ("request a link, confirm a link, enter a link code") cover the routes needed before sign-in to obtain a CSRF token and to inspect a link without spending it? [Conflict, Spec §FR-023, §FR-034, §FR-007] — spec: FR-023 now names getting a CSRF token and checking a link.
+- [x] CHK015 Is the precedence between 401 (FR-023) and 403 (FR-034) defined for a signed-out, state-changing request that also lacks a CSRF token? [Conflict, Spec §FR-023, §FR-034] — spec: FR-023, CSRF check first, 403 with or without a session.
+- [x] CHK016 Is it specified whether `OPTIONS` requests need a session (FR-023 names only sign-in and health routes as exempt)? [Clarity, Spec §FR-023, §FR-034] — no CORS, so no OPTIONS routes are served (research R2).
+- [x] CHK017 Is "comes from the `APP_URL` origin" defined for requests that carry no `Origin` header? [Ambiguity, Spec §FR-034] — a missing Origin is refused (research R2).
+- [x] CHK018 Does FR-026's rule apply to the People action record (can a staff member read actions about themselves)? [Coverage, Spec §FR-026, §FR-032] — no route reads People action records in 002.
+- [x] CHK019 Is the answer for another person's device (403 or 404, or "not distinguishable from nonexistent") specified? [Gap, Spec §US6-4, §FR-026] — another person's device answers 404 (contracts/http.md).
+- [x] CHK020 Is the constitution's "Antn as the only admin" (delivery order, 002) reconciled with FR-022's "at launch" and FR-030's promotion of others? [Conflict, Constitution §Delivery order, Spec §FR-022, §FR-030] — spec Assumptions: "only admin" means at launch; no amendment (decided 2026-11-25).
+- [x] CHK021 Are response-security requirements (frame embedding, content security, referrer policy) specified for the sign-in and confirm pages, which handle a token in the URL? [Gap, Spec §FR-007, §FR-035] — spec: new FR-042; headers in research R15.
 
 ## Rate limits
 
-- [ ] CHK022 Is "client" (FR-020, FR-021) defined in a requirement rather than only in Assumptions, including what counts when the client address is unknown? [Clarity, Spec §FR-020, §FR-021, Assumptions]
-- [ ] CHK023 Is it specified whether a request refused by a rate limit itself counts toward that limit? [Ambiguity, Spec §FR-021]
-- [ ] CHK024 Is the "try again later" answer's timing required to be indistinguishable for known and unknown addresses, as FR-003 requires for the normal answer? [Consistency, Spec §FR-003, §FR-021, §SC-008]
-- [ ] CHK025 Is the window type (sliding or fixed) for "3 per 15 minutes" and "10 per 10 minutes" specified, so the limit is measurable at window boundaries? [Measurability, Spec §FR-020, §FR-021]
-- [ ] CHK026 Is "comparable timing" (US2-2) the same measure as SC-008's "median within 50 ms over 100 requests"? [Consistency, Spec §US2-2, §SC-008]
+- [x] CHK022 Is "client" (FR-020, FR-021) defined in a requirement rather than only in Assumptions, including what counts when the client address is unknown? [Clarity, Spec §FR-020, §FR-021, Assumptions] — spec Assumptions plus research R1.
+- [x] CHK023 Is it specified whether a request refused by a rate limit itself counts toward that limit? [Ambiguity, Spec §FR-021] — only accepted requests are recorded (research R7).
+- [x] CHK024 Is the "try again later" answer's timing required to be indistinguishable for known and unknown addresses, as FR-003 requires for the normal answer? [Consistency, Spec §FR-003, §FR-021, §SC-008] — the per-address limit runs before the lookup, the same for every address (research R7).
+- [x] CHK025 Is the window type (sliding or fixed) for "3 per 15 minutes" and "10 per 10 minutes" specified, so the limit is measurable at window boundaries? [Measurability, Spec §FR-020, §FR-021] — sliding window (research R7).
+- [x] CHK026 Is "comparable timing" (US2-2) the same measure as SC-008's "median within 50 ms over 100 requests"? [Consistency, Spec §US2-2, §SC-008] — SC-008 quantifies US2-2's "comparable timing".
 
 ## Secrets and personal data in telemetry
 
-- [ ] CHK027 Does FR-040's list of values that must never appear in telemetry include client IP addresses and User-Agent strings, or are they explicitly allowed? [Gap, Spec §FR-040]
-- [ ] CHK028 Are "secret-shaped values" (FR-027) and "secret-named fields" defined well enough to be tested objectively? [Clarity, Spec §FR-027]
-- [ ] CHK029 Does FR-027's scan cover response headers as well as bodies, with the session cookie as the stated exception? [Completeness, Spec §FR-027, §FR-035]
-- [ ] CHK030 Is it specified whether the People action record (FR-032) and rate-limit data may hold client addresses or email hashes? [Gap, Spec §FR-032, §FR-040]
-- [ ] CHK031 Is "32 bytes" for `SESSION_SECRET` defined unambiguously (characters of the string, or bytes after decoding)? [Clarity, Spec §FR-036]
-- [ ] CHK032 Are the outcome values FR-041 asks for ("each by outcome") enumerated in the spec or explicitly left to the plan? [Measurability, Spec §FR-041]
-- [ ] CHK033 Is a requirement defined for escaping or limiting a person's name, which an admin enters, wherever it appears in emails and pages? [Gap, Spec §FR-002, §FR-039]
+- [x] CHK027 Does FR-040's list of values that must never appear in telemetry include client IP addresses and User-Agent strings, or are they explicitly allowed? [Gap, Spec §FR-040] — spec: FR-040 adds client IPs and User-Agents, the proxy log included; research R1, R10.
+- [x] CHK028 Are "secret-shaped values" (FR-027) and "secret-named fields" defined well enough to be tested objectively? [Clarity, Spec §FR-027] — defined in research R9.
+- [x] CHK029 Does FR-027's scan cover response headers as well as bodies, with the session cookie as the stated exception? [Completeness, Spec §FR-027, §FR-035] — headers scanned, the session cookie the only exception (research R9).
+- [x] CHK030 Is it specified whether the People action record (FR-032) and rate-limit data may hold client addresses or email hashes? [Gap, Spec §FR-032, §FR-040] — rate-limit data is HMAC only; People actions carry staff IDs only (data-model §6, §7).
+- [x] CHK031 Is "32 bytes" for `SESSION_SECRET` defined unambiguously (characters of the string, or bytes after decoding)? [Clarity, Spec §FR-036] — UTF-8 bytes of the value (research R8).
+- [x] CHK032 Are the outcome values FR-041 asks for ("each by outcome") enumerated in the spec or explicitly left to the plan? [Measurability, Spec §FR-041] — enumerated in research R10.
+- [x] CHK033 Is a requirement defined for escaping or limiting a person's name, which an admin enters, wherever it appears in emails and pages? [Gap, Spec §FR-002, §FR-039] — plain text, 1–80 characters, escaped (research R16).
 
 ## Failure and recovery paths
 
-- [ ] CHK034 After an invite's email fails (edge case), is the state defined: does the person exist as "invited" with a usable link, so that retry means "resend"? [Clarity, Spec §Edge Cases, §FR-029]
-- [ ] CHK035 Is it specified whether a failed sign-in email counts toward the per-address and per-client limits? [Gap, Spec §FR-021, §Edge Cases]
-- [ ] CHK036 Is the first-admin bootstrap's behaviour defined when its invite email fails at startup (retry, log only, recovery by sign-in link)? [Gap, Spec §FR-033]
-- [ ] CHK037 Is the bootstrap's behaviour defined when `INITIAL_ADMIN_EMAIL` already belongs to a non-admin person? [Edge Case, Gap, Spec §FR-033, §FR-002]
-- [ ] CHK038 Is recovery defined for a typo in `INITIAL_ADMIN_EMAIL`, given that startup ignores the setting once any admin exists "in any status"? [Gap, Recovery, Spec §FR-033]
-- [ ] CHK039 Is recovery defined for losing access to the only admin account, for example a lost mailbox, since self-demotion is impossible and no other admin exists? [Gap, Recovery, Spec §FR-030]
-- [ ] CHK040 Are FR-036 to FR-038's startup refusals stated for the worker as well as the api, or explicitly api-only? [Clarity, Spec §FR-036, §FR-038]
-- [ ] CHK041 Is the visible answer defined when the database is unreachable during sign-in or a session check (401, 503, or a neutral message)? [Gap, Exception Flow]
-- [ ] CHK042 Is the effect of changing `APP_URL` (when the domain is chosen) on outstanding links, sessions and the origin check specified? [Gap, Spec §FR-004, §FR-034, Assumptions]
-- [ ] CHK043 Is "a mailbox on `rivierarecords.de`" (FR-037) clear about whether subdomains such as `mail.rivierarecords.de` are accepted? [Clarity, Spec §FR-037]
-- [ ] CHK044 Is it specified what a reactivated admin's role is (FR-031 keeps the role), and whether reactivation needs the same "another admin" rule as promotion? [Consistency, Spec §FR-030, §FR-031]
+- [x] CHK034 After an invite's email fails (edge case), is the state defined: does the person exist as "invited" with a usable link, so that retry means "resend"? [Clarity, Spec §Edge Cases, §FR-029] — the person stays invited with a usable link, so retry means resend (contracts/http.md).
+- [x] CHK035 Is it specified whether a failed sign-in email counts toward the per-address and per-client limits? [Gap, Spec §FR-021, §Edge Cases] — accepted requests count whether or not the send succeeds (research R7).
+- [x] CHK036 Is the first-admin bootstrap's behaviour defined when its invite email fails at startup (retry, log only, recovery by sign-in link)? [Gap, Spec §FR-033] — logged; recovery with an ordinary sign-in link (FR-033, research R11).
+- [x] CHK037 Is the bootstrap's behaviour defined when `INITIAL_ADMIN_EMAIL` already belongs to a non-admin person? [Edge Case, Gap, Spec §FR-033, §FR-002] — can't arise: every person is invited by an admin, and admins are never removed.
+- [x] CHK038 Is recovery defined for a typo in `INITIAL_ADMIN_EMAIL`, given that startup ignores the setting once any admin exists "in any status"? [Gap, Recovery, Spec §FR-033] — spec: FR-033 moves the pending invite until an admin signs in.
+- [x] CHK039 Is recovery defined for losing access to the only admin account, for example a lost mailbox, since self-demotion is impossible and no other admin exists? [Gap, Recovery, Spec §FR-030] — spec Assumptions: host access with the manual steps in the quickstart.
+- [x] CHK040 Are FR-036 to FR-038's startup refusals stated for the worker as well as the api, or explicitly api-only? [Clarity, Spec §FR-036, §FR-038] — the worker needs SESSION_SECRET; SMTP and the first admin are api only (research R8).
+- [x] CHK041 Is the visible answer defined when the database is unreachable during sign-in or a session check (401, 503, or a neutral message)? [Gap, Exception Flow] — 503 unavailable (research R16, contracts/http.md).
+- [x] CHK042 Is the effect of changing `APP_URL` (when the domain is chosen) on outstanding links, sessions and the origin check specified? [Gap, Spec §FR-004, §FR-034, Assumptions] — in effect signs everyone out (research R16).
+- [x] CHK043 Is "a mailbox on `rivierarecords.de`" (FR-037) clear about whether subdomains such as `mail.rivierarecords.de` are accepted? [Clarity, Spec §FR-037] — exactly rivierarecords.de, no subdomains (research R8).
+- [x] CHK044 Is it specified what a reactivated admin's role is (FR-031 keeps the role), and whether reactivation needs the same "another admin" rule as promotion? [Consistency, Spec §FR-030, §FR-031] — FR-031 keeps the role; reactivation is an admin action (FR-024).
 
 ## People and You screens (UX)
 
-- [ ] CHK045 Are the visible messages specified for every refusal a person can meet: code refused, rate limited, already on the list, not allowed (self, last admin), email failed? Only the neutral and link-refusal messages are worded today. [Completeness, Spec §FR-009, §FR-019, §FR-021, §US4-5]
-- [ ] CHK046 Does the spec define which People actions, if any, exist in the phone layout, beyond removing the device count and "sign out everywhere"? [Gap, Spec §FR-028]
-- [ ] CHK047 Are confirmation steps required before destructive People and device actions (deactivate, cancel invite, sign out everywhere, sign out a device)? [Gap, Spec §FR-016, §FR-028, §FR-031]
-- [ ] CHK048 Are empty and single-item states defined (the People list with only the admin, the device list with only the current device)? [Gap, Spec §US4, §US6]
-- [ ] CHK049 Is the precision of "last seen" as displayed (relative time, date) specified? [Clarity, Spec §FR-028, §US6-1]
-- [ ] CHK050 Is the behaviour defined when a signed-out person opens a deep link (return to it after sign-in, or always start at the home screen)? [Gap, Spec §FR-023]
-- [ ] CHK051 Are accessibility requirements stated for the sign-in, code entry and People screens beyond the constitution's axe gate (keyboard use, numeric input and one-time-code autofill for the code)? [Gap, Constitution §Quality Gates]
-- [ ] CHK052 Is the display of a link code's remaining lifetime specified (static "10 minutes" or a countdown, and what happens on screen when it expires)? [Clarity, Spec §US5-1]
-- [ ] CHK053 Is the UI and email language (English) stated as an assumption? [Assumption, Spec §FR-039]
-- [ ] CHK054 Can SC-001 ("under 1 minute from opening the invite email") and SC-002 ("under 30 seconds") be measured objectively, given that they depend on people? [Measurability, Spec §SC-001, §SC-002]
-- [ ] CHK055 Is it specified how the People list orders and labels its statuses, including a reactivation invite as against a first invite? [Clarity, Spec §FR-028, §FR-031]
+- [x] CHK045 Are the visible messages specified for every refusal a person can meet: code refused, rate limited, already on the list, not allowed (self, last admin), email failed? Only the neutral and link-refusal messages are worded today. [Completeness, Spec §FR-009, §FR-019, §FR-021, §US4-5] — one plain-English message per refusal code (research R13).
+- [x] CHK046 Does the spec define which People actions, if any, exist in the phone layout, beyond removing the device count and "sign out everywhere"? [Gap, Spec §FR-028] — spec: FR-028, People pages laptop only.
+- [x] CHK047 Are confirmation steps required before destructive People and device actions (deactivate, cancel invite, sign out everywhere, sign out a device)? [Gap, Spec §FR-016, §FR-028, §FR-031] — spec: FR-028, confirmation naming the person for People actions.
+- [x] CHK048 Are empty and single-item states defined (the People list with only the admin, the device list with only the current device)? [Gap, Spec §US4, §US6] — defaults in research R13.
+- [x] CHK049 Is the precision of "last seen" as displayed (relative time, date) specified? [Clarity, Spec §FR-028, §US6-1] — relative, exact time on hover (research R13).
+- [x] CHK050 Is the behaviour defined when a signed-out person opens a deep link (return to it after sign-in, or always start at the home screen)? [Gap, Spec §FR-023] — return to the page after sign-in, same-origin paths only (research R13).
+- [x] CHK051 Are accessibility requirements stated for the sign-in, code entry and People screens beyond the constitution's axe gate (keyboard use, numeric input and one-time-code autofill for the code)? [Gap, Constitution §Quality Gates] — labelled fields, numeric one-time-code input (research R13).
+- [x] CHK052 Is the display of a link code's remaining lifetime specified (static "10 minutes" or a countdown, and what happens on screen when it expires)? [Clarity, Spec §US5-1] — expiry time and countdown (research R13).
+- [x] CHK053 Is the UI and email language (English) stated as an assumption? [Assumption, Spec §FR-039] — English (research R8).
+- [x] CHK054 Can SC-001 ("under 1 minute from opening the invite email") and SC-002 ("under 30 seconds") be measured objectively, given that they depend on people? [Measurability, Spec §SC-001, §SC-002] — timed in e2e, email delivery excluded (research R16).
+- [x] CHK055 Is it specified how the People list orders and labels its statuses, including a reactivation invite as against a first invite? [Clarity, Spec §FR-028, §FR-031] — grouping and labels in research R13.
 
 ## Notes
 
@@ -94,3 +94,7 @@ People and You screens are complete, clear, consistent and measurable before
 - `checklists/requirements.md` has a separate built-in lifecycle maintained by `/speckit-specify` and `/speckit-clarify`
 - Several items are settled in the plan rather than the spec (for example CHK014, CHK015, CHK017, CHK019, CHK023, CHK025 and CHK031 are answered in research.md R2, R4, R7 and contracts/http.md). The reviewer decides whether a plan-level answer is enough or the spec should say it.
 - CHK020 is the open point already raised in plan.md (research R14).
+- **Review, 2026-11-25**: Antn went through every item with the agent and decided CHK013, 014,
+  015, 020, 021, 027, 038, 039, 046 and 047, which led to the spec changes listed in its
+  Clarifications. Antn accepted the plan's answers for the rest and asked the agent to record the
+  ticks on his behalf. Each note says where the criterion is settled.
