@@ -25,6 +25,9 @@ being written are marked **(decided)**.
     address. `X-Forwarded-For` is never read. IPv6 addresses count by their /64 prefix, so one
     host can't rotate through its own range. The key is stored only as an HMAC (R4), never
     as the address.
+- **Access log** (FR-040 as clarified): both listeners use a `log_format` with neither
+  `$remote_addr`, `$http_x_forwarded_for`, `$http_cf_connecting_ip` nor `$http_user_agent`
+  (time, method, path without query, status, bytes, duration, request ID).
 - **Tests**: a static test of `proxy/nginx.conf`, in the style of `proxy-config.test.ts`. The
   port-80 block sets the header from `$remote_addr` and never mentions `cf_connecting_ip`. The
   8081 block uses it. Port 8081 appears in no compose `ports:`, and `edge` holds only `proxy`.
@@ -213,9 +216,10 @@ being written are marked **(decided)**.
 
   | Setting | production | development / ci |
   |---|---|---|
-  | `SESSION_SECRET` | required, ≥ 32 bytes, must not start with `dev-only` | required, ≥ 32 bytes (Makefile and CI pass the fixed placeholder `dev-only-session-secret-0000000000000000`) |
+  | `APP_URL` | `https:`, or `http:` only for `localhost` / `127.0.0.1` (FR-036) | any |
+  | `SESSION_SECRET` | required, ≥ 32 UTF-8 bytes, must not start with `dev-only` | required, ≥ 32 bytes (Makefile and CI pass the fixed placeholder `dev-only-session-secret-0000000000000000`) |
   | `SMTP_URL` | required, `smtp:`/`smtps:`, allowed IONOS host | **must be empty** (FR-038); capture transport |
-  | `EMAIL_FROM` | required, an address on `rivierarecords.de` | optional; defaults to `dev-capture@localhost.invalid` |
+  | `EMAIL_FROM` | required, an address whose domain is exactly `rivierarecords.de` (no subdomains) | optional; defaults to `dev-capture@localhost.invalid` |
   | `INITIAL_ADMIN_EMAIL` | optional; if set, must be an email address | same |
   | `INITIAL_ADMIN_NAME` | optional, 1–80 characters | same |
 
@@ -284,16 +288,21 @@ being written are marked **(decided)**.
   is that they are never passed to a logger or span. The planted-value test enforces this.
 - **Planted-value test** (FR-040, SC-006): `telemetry-planted.int.test.ts` runs every auth flow
   with distinctive values: an email, a name, the link token, the code, the session cookie, the
-  CSRF token and a push endpoint. It collects stdout log lines and 001's in-memory spans,
+  CSRF token, a push endpoint, a client IP address and a User-Agent string. It collects stdout log lines and 001's in-memory spans,
   span events and metric points, and asserts that none of the planted strings appears.
 
 ## R11. First admin from `INITIAL_ADMIN_EMAIL` (FR-033)
 
 - **Decision**: a step `bootstrapFirstAdmin()` in `startService`, for the api only, after
-  migrations. Inside a transaction holding `pg_advisory_xact_lock(<fixed key>)`: if any staff row
-  has `role = 'admin'` (any status), do nothing. Otherwise, if the setting is empty, log
-  `{ event: "auth.bootstrap", outcome: "not_configured" }` and continue starting. Otherwise
-  insert the person as an invited admin (name from `INITIAL_ADMIN_NAME`, or the part of the
+  migrations, inside a transaction holding `pg_advisory_xact_lock(<fixed key>)`:
+  - Any admin has `first_signed_in_at` set: do nothing.
+  - An admin exists but none has signed in (the pending first admin): if the setting names a
+    different address, update that person's email and name, delete their links, insert a new
+    invite and a `people_action` (`first_admin_readdress`, `actor_staff_id = null`, no
+    address). If it names the same address, or is empty, do nothing (FR-033 as clarified).
+  - No admin exists and the setting is empty: log
+    `{ event: "auth.bootstrap", outcome: "not_configured" }` and continue starting.
+  - No admin exists: insert the person as an invited admin (name from `INITIAL_ADMIN_NAME`, or the part of the
   address before `@`), insert a 7-day invite link and a `people_action`
   (`actor_staff_id = null`, meaning startup). The invite email goes to the background sender
   **after `listen`**, so a slow SMTP server never delays startup or health. Nothing logs the
@@ -322,12 +331,29 @@ being written are marked **(decided)**.
 
 - **Decision**: plain TypeScript modules in `apps/web/src/` like today's shell, with no framework
   added in 002: sign in (email, "I have a code"), confirm, You (devices, link code, push) and
-  People (laptop layout with device count and "sign out everywhere"; the phone layout without
-  them). A small `api.ts` fetch wrapper fetches the CSRF token once and sends it with every
+  People. People is laptop only (FR-028 as clarified): at phone width it shows only "The People
+  pages are on the computer layout". Deactivate, cancel invite, sign out everywhere and role
+  changes open a confirmation naming the person; a person's own device actions don't.
+- **UX defaults** (security checklist CHK045–CHK055, accepted by Antn):
+  - one plain-English message per refusal code, listed next to the codes in contracts/http.md;
+  - People with only the admin shows "Invite a colleague"; a single device hides "Sign out
+    other devices";
+  - last seen is relative ("5 min ago", "yesterday") with the exact time on hover;
+  - after sign-in the app returns to the page that sent the person to sign in (same-origin
+    paths only, otherwise home);
+  - every field is labelled and keyboard-usable; the code field uses `inputmode="numeric"` and
+    `autocomplete="one-time-code"`;
+  - a link code shows its expiry time and a countdown, then "This code has expired. Get a new
+    one.";
+  - People is grouped invited, active, deactivated, then sorted by name; a reactivation invite
+    is labelled "invited (reactivation)". A small `api.ts` fetch wrapper fetches the CSRF token once and sends it with every
   state-changing call. Playwright e2e tests at 390×844 and 1440×900 with axe cover the flows.
   Final visual design comes later (spec Assumptions).
 
-## R14. Open point for Antn: "the only admin" **(check)**
+## R14. "The only admin" (decided)
+
+**Decided 2026-11-25**: Antn confirmed the spec's reading, "at launch" (spec Assumptions). No
+constitution amendment. The original note follows.
 
 The constitution's delivery order says 002 is "Auth: magic link, invite only, roles admin and
 staff, **Antn as the only admin**". The approved spec reads that as "at launch" (FR-022) and
@@ -336,3 +362,37 @@ plan implements the spec. If the constitution means "only ever one admin in 002"
 promotion and the last-admin rule would have to go, which is a spec change. If it means "at
 launch", the constitution's wording could be clarified by a PATCH amendment. This plan changes
 neither and leaves the call to Antn.
+
+## R15. Browser protections (FR-042)
+
+- **Decision**: the proxy adds these headers with `always` to every response it serves, PWA and
+  api alike, and the api sets the same ones itself, so `app.inject()` tests and the proxy agree:
+  - `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+    connect-src 'self'; img-src 'self' data:; manifest-src 'self'; frame-ancestors 'none';
+    base-uri 'none'; form-action 'self'; object-src 'none'`
+  - `X-Frame-Options: DENY`, for older browsers
+  - `Referrer-Policy: no-referrer`
+  - `X-Content-Type-Options: nosniff`
+- Later features that embed YouTube (handoff §5) extend `frame-src` in their own spec.
+- **Tests**: a static test of `proxy/nginx.conf`, an api test over every served route (from the
+  route inventory, R9), and an e2e check of the pages' headers.
+- **Alternatives**: `@fastify/helmet` (more defaults than we want, and the PWA's headers would
+  still have to come from nginx); CSP in a `<meta>` tag (can't set `frame-ancestors`).
+
+## R16. Notes from the security checklist review
+
+Answers that the checklist (`checklists/security.md`) asked to be written down:
+
+- **Link codes** are shown once, on the device that asked for them; being stored as an HMAC,
+  they can't be shown again (CHK004).
+- **No limit** on how often a signed-in person requests link codes, and **no cap** on devices
+  per person: excluded for a team this size (CHK005, CHK010).
+- **Names** are plain text, 1–80 characters, escaped in HTML pages and emails, never put in a
+  subject line (CHK033).
+- **Database unreachable**: every route answers `503 {"error":"unavailable"}`; `/readyz` fails as
+  in 001 (CHK041).
+- **Changing `APP_URL`** (when the domain is chosen) signs everyone out in effect: the cookie
+  is host-only, the origin check follows the new URL, and links point at the old address
+  (CHK042).
+- **SC-001 and SC-002** are timed in e2e from opening the captured link, or from requesting the
+  code, to the signed-in screen; email delivery is outside the measure (CHK054).

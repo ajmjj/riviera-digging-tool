@@ -60,8 +60,9 @@ make up-dev
 
 ## 5. People actions (US4)
 
-On the laptop layout (1440×900): Mia's row shows "2 devices" and "Sign out everywhere". At
-phone width (390×844) neither appears. Deactivate Mia: both her browsers answer 401, and a new
+On the laptop layout (1440×900): Mia's row shows "2 devices" and "Sign out everywhere", and
+each action asks for confirmation naming Mia. At phone width (390×844) People shows only a note
+to use a computer. Deactivate Mia: both her browsers answer 401, and a new
 link request for her captures nothing. Reactivate her: a new invite is captured, and signing in
 keeps her staff ID.
 
@@ -70,6 +71,22 @@ keeps her staff ID.
 With `make up-dev` (the observability profile is on), Grafana's Explore shows
 `riviera_auth_sign_ins_total{method,outcome}` and the other auth counters. Search Loki for
 `mia@example.test`, for `rdl_` and for the code: nothing is found.
+
+## Wrong first-admin address
+
+Before anyone has signed in as admin, fix `INITIAL_ADMIN_EMAIL` in `.env` and restart the api
+(`docker compose up -d api`). The pending invite moves to the new address and a fresh invite is
+captured or sent; the old link no longer works (FR-033).
+
+## The only admin lost their mailbox
+
+There is no route or command for this in 002 (spec Assumptions); it needs the host. Promote a
+second admin early to avoid it. On the host:
+
+1. `docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"`
+2. `UPDATE staff SET email = lower(btrim('new-address@example.org')) WHERE role = 'admin' AND status = 'active' AND id = '<staff id>';`
+   (find the ID with `SELECT id, role, status FROM staff WHERE role = 'admin';`)
+3. Request a sign-in link for the new address on the sign-in screen.
 
 ## Emergency sign-out
 
