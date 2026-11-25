@@ -30,6 +30,12 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - **Invitee**: someone an admin has invited who has not signed in yet.
 - **Visitor**: anyone without a valid session, including people who were never invited.
 
+## Clarifications
+
+### Session 2026-11-25
+
+- Q: How long should a sign-in link stay valid, and how long should an invite link stay valid? → A: Sign-in link 15 minutes; invite link 7 days.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Accept an invite and sign in for the first time (Priority: P1)
@@ -428,9 +434,7 @@ other out, and check its next request answers 401.
 
 ## Assumptions
 
-- Lifetimes, limits and other values above that aren't marked for clarification are proposals
-  for `/speckit-clarify` to confirm: the 15-minute sign-in link (the CLAUDE.md example), the
-  7-day invite link, and the rate limits of FR-020 and FR-021.
+- The rate limits of FR-020 and FR-021 are proposals for `/speckit-clarify` to confirm.
 - The client a rate limit counts is identified by the connecting address the proxy reports.
   Behind the Cloudflare Tunnel that is Cloudflare's client-address header, trusted only from the
   tunnel; locally, the proxy's view of the client.
