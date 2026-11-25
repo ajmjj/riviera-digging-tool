@@ -39,6 +39,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: What limits should apply to requests for sign-in links and to attempts at entering link codes? → A: Link requests 3 per email address per 15 min and 20 per client per hour; a code dies after 5 wrong tries; 10 wrong tries per client per 10 min; no tool-wide cap.
 - Q: Which email service and sender address should send the sign-in and invite emails? → A: IONOS SMTP, sending from a mailbox on `rivierarecords.de` (for example `dig@rivierarecords.de`).
 - Q: Can an admin remove admin rights from another admin or deactivate them, and can an admin demote or deactivate themself? → A: Admins can demote or deactivate other admins, never themselves; self-removal needs another admin.
+- Q: Should 002 already allow for a read-only role, so the shop owner could see the staff purchases log without being an admin? → A: No. Two roles only, admin and staff; any later role is a change to 002's role model.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -320,8 +321,10 @@ other out, and check its next request answers 401.
 
 **Roles and access**
 
-- **FR-022**: Every person MUST have exactly one role, admin or staff. At launch, Antn is the only
-  admin.
+- **FR-022**: Every person MUST have exactly one role, admin or staff, and there MUST be no other
+  role. At launch, Antn is the only admin. A further role (for example read-only access to the
+  staff purchases log for the shop owner, handoff §14) is out of scope and would be a change to
+  this spec.
 - **FR-023**: Every route MUST require a valid session except the sign-in routes (request a
   link, confirm a link, enter a link code) and the health endpoints. A request without a valid
   session MUST answer 401.
