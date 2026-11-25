@@ -46,6 +46,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: When someone opens a sign-in link, should they have to tap "Confirm sign-in" before they are signed in? → A: Yes: opening the link shows a "Confirm sign-in" button and only tapping it signs in; no automatic confirm by script.
 - Q: How should the first admin be created on a fresh install? (revisited) → A: From the `.env` setting `INITIAL_ADMIN_EMAIL` (Antn's address, set only in `.env`, never committed): at startup, if no admin exists, the api creates that admin and emails an invite; otherwise it does nothing.
 - Q: With the per-code counter dropped, should wrong link-code guesses get a tool-wide cap? → A: No; only 10 wrong tries per client per 10 min.
+- Q: When an admin cancels the invite of someone who has never signed in, what happens to their record, and can the address be invited again? → A: The record is removed; the action log keeps the staff ID without the address; the address can be invited again as a new person.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -65,7 +66,7 @@ device is recorded for them.
 **Acceptance Scenarios**:
 
 1. **Given** an admin invites "Mia" at an email address nobody uses yet, **When** the invite
-   is saved, **Then** one email is sent to that address containing a sign-in link that starts
+   is saved, **Then** one email is sent to that address containing an invite link that starts
    with `APP_URL`, and Mia appears on the People page as "invited".
 2. **Given** Mia opens the link within its lifetime, **When** she confirms sign-in, **Then**
    she is signed in with the staff role, her account becomes active, and her current device is
@@ -157,7 +158,7 @@ person's status, their sessions, and the emails captured.
 1. **Given** a pending invite, **When** the admin resends it, **Then** a new email with a new
    link is sent and the previous invite link stops working.
 2. **Given** a pending invite, **When** the admin cancels it, **Then** its link stops working
-   and the person disappears from the People list's pending invites.
+   and the person is removed from the People list, so their address can be invited again.
 3. **Given** an active staff member signed in on two devices, **When** the admin deactivates
    them, **Then** both devices are signed out at their next request, their devices and push
    subscriptions are removed, any outstanding sign-in links and link codes stop working, and
@@ -270,12 +271,12 @@ other out, and check its next request answers 401.
   address; there is no self-registration.
 - **FR-002**: Inviting a person MUST create them with the staff role (the first admin of FR-033
   is the one exception) and the status "invited",
-  and send one email containing a sign-in link. Email addresses MUST be compared after trimming
+  and send one email containing an invite link. Email addresses MUST be compared after trimming
   spaces and ignoring letter case, and an address can belong to at most one person.
 - **FR-003**: Any visitor MUST be able to request a sign-in link by entering an email address.
   A link MUST be emailed only when the address belongs to an active or invited person. The
   visible answer, its status code and its timing MUST NOT reveal whether the address is known.
-- **FR-004**: Every sign-in link MUST point at the configured `APP_URL` and MUST contain an
+- **FR-004**: Every sign-in or invite link MUST point at the configured `APP_URL` and MUST contain an
   unguessable token of at least 128 bits of randomness. The token MUST be stored only in a form
   from which it cannot be recovered (for example a hash), never as sent.
 - **FR-005**: A sign-in link MUST expire 15 minutes after it is issued, and an invite link 7
@@ -366,7 +367,7 @@ other out, and check its next request answers 401.
   and "sign out everywhere" of FR-028. In this feature the rule MUST be
   enforced and tested on devices, sessions and push subscriptions; later features that add
   verdicts, piles and Discogs accounts MUST use the same scoping and add their own tests.
-- **FR-027**: No route's response MUST contain a Discogs token, a session or CSRF secret, a
+- **FR-027**: A route's response MUST NOT contain a Discogs token, a session or CSRF secret, a
   sign-in token or a token hash, any person's own included. CI MUST check this by calling every
   served route, as each role, and scanning the responses for secret-named fields and
   secret-shaped values. (Discogs accounts and verdicts arrive in later features; their specs
@@ -385,7 +386,10 @@ other out, and check its next request answers 401.
   390×844). The server enforces the admin role for both (FR-024); it doesn't tell layouts apart.
 - **FR-029**: Admins MUST be able to resend a pending invite (FR-008 applies) and cancel a
   pending invite (its links stop working at once). Neither action applies to an active or
-  deactivated person.
+  deactivated person. Cancelling the invite of someone who has never signed in MUST remove their
+  person record, so their address can be invited again later as a new person; the People action
+  record of the cancellation (FR-032) keeps their staff ID but not their address or name.
+  Cancelling a reactivation invite works as FR-031 says.
 - **FR-030**: Admins MUST be able to make an active staff member an admin, and to make another
   admin a staff member again. An admin MUST NOT be able to demote or deactivate themself: those
   requests MUST be refused and change nothing, so giving up admin rights always needs another
@@ -470,7 +474,8 @@ other out, and check its next request answers 401.
   or invite), issued, expires, used or invalidated. Only a non-recoverable form of the token is
   stored.
 - **Link code**: a 6-digit, single-use code for one person, valid 10 minutes.
-- **People action record**: who did which People action to whom, and when.
+- **People action record**: who did which People action to whom, and when, by staff IDs only; it
+  outlives a removed person record (FR-029).
 - **Outgoing email**: recipient, kind (invite, sign-in), the link, and the outcome of sending.
   In development and CI it is captured instead of sent.
 

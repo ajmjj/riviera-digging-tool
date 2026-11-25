@@ -32,10 +32,11 @@
 ## Notes
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`
-- **Clarify is complete.** Two rounds on 2026-11-25 settled 10 questions; the answers are in the
-  spec's Clarifications section and no [NEEDS CLARIFICATION] markers remain.
+- **Clarify is complete.** Two rounds on 2026-11-25 and follow-ups from review recorded 13
+  answers, two of which revise earlier ones (marked in place); they are in the spec's
+  Clarifications section and no [NEEDS CLARIFICATION] markers remain.
 - **Named settings and status codes are constraints, not design.** `APP_URL`, `SESSION_SECRET`,
-  `SMTP_URL`, `EMAIL_FROM`, IONOS SMTP, 401/403, the cookie properties and the two checked
+  `SMTP_URL`, `EMAIL_FROM`, `INITIAL_ADMIN_EMAIL`, IONOS SMTP, 401/403, the cookie properties and the two checked
   screen sizes come from the brief, the constitution, `.env.example` and Antn's answers, and they
   are what the tests assert. The spec doesn't choose libraries, storage layout, the CSRF token
   mechanism or how the client address is read behind the tunnel; those belong in
