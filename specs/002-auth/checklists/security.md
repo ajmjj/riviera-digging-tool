@@ -97,4 +97,4 @@ People and You screens are complete, clear, consistent and measurable before
 - **Review, 2026-11-25**: Antn went through every item with the agent and decided CHK013, 014,
   015, 020, 021, 027, 038, 039, 046 and 047, which led to the spec changes listed in its
   Clarifications. Antn accepted the plan's answers for the rest and asked the agent to record the
-  ticks on his behalf. Each note says where the criterion is settled.
+  ticks on their behalf. Each note says where the criterion is settled.
