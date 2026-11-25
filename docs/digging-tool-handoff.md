@@ -23,8 +23,9 @@ An internal tool that lets Riviera Records staff listen through the shop's ~20,0
 
 ## 3. Data model (minimum)
 
-- `staff(id, email, name, role[admin|staff], active, created_at)`. Antn is the only admin at launch.
-- `session`, `magic_link(token, expires)`, `device(staff_id, name, last_seen, push_subscription)`, `link_code(code, staff_id, expires)` (6 digits, 10-minute expiry)
+- `staff(id, email, name, role[admin|staff], status[invited|active|deactivated], …)`. Antn is the only admin at launch; admins can make others admins.
+- `session`, `magic_link`, `device(staff_id, name, last_seen, push_subscription)`, `link_code` (6 digits, 10-minute expiry). Tokens and codes are stored only as keyed hashes, never as sent.
+- Auth is specified in `specs/002-auth/` (spec and `data-model.md`), which wins over this sketch.
 - `record(listing_id, item_id, listing_ref, discogs_release_id, artist, title, label, catno, year, styles[], genres[], condition, list_price, location /*box*/, has_snippet, cg_snippet_uris[], cg_video_uris[], status, posted, synced_at)`
 - `box(code, genre_label, sort_order)`. The shelf order comes from the box code, unless a config overrides it.
 - `verdict(staff_id, listing_id, value[pass|maybe|want|noaudio], created_at, source[box|foryou|shoplist])`. There is one current verdict per staff member per record, and every change is logged so undo works.
@@ -80,10 +81,10 @@ Each record tries three sources in order:
 | Pull list (phone) | The Want pile in shelf order, ticked off one record at a time. Laptop "Pull on my phone" sends a push notification that opens it |
 | Staff checkout | Only the records ticked on the pull list. See section 9 |
 | Discogs connect | Personal access token → validate with `/oauth/identity` → store encrypted. Send it as `Authorization: Discogs token=…`. Export = add each Want to the wantlist with an optional note "Riviera · box C14 · staff €7.50", queued at Discogs' limit of 60 requests a minute |
-| You & team | Profile counts, devices, link code, team list (heard, current box, % of shop), admin "Invite a colleague", notification switches |
+| You & team | Profile counts, devices, link code, team list (heard, current box, % of shop), notification switches. Admins invite colleagues from People, on the laptop only (spec 002, FR-028) |
 | Your sound | Signatures, want rate per style, eras, labels, taste twin. "Tune it" hides a style or label |
 | Notifications | Price drop on Maybe/Want records or strong matches (especially when a price crosses €20 and the discount doubles), pile record sold, new arrivals that match (only in boxes already finished), shop-list reminder on shift days, weekly recap. Respect quiet hours |
-| Admin pages (laptop) | People, shop settings, staff purchases log, sync health. See section 13. Not on the canvas yet |
+| Admin pages (laptop) | People, shop settings, staff purchases log, sync health. See section 13. Not on the canvas yet. People is laptop only; a phone shows a note to use a computer (spec 002, FR-028) |
 
 ## 8. Taste profile ("Your sound")
 
@@ -134,7 +135,7 @@ Antn hosts it on his own machine for now. Everything runs with one `docker compo
 - `worker`: syncs, the rate-limited job queue, taste-profile recompute, notifications. Same image as `api`, different command.
 - `web`: the built PWA (static files), served by the proxy.
 - `db`: Postgres, data on a named volume (`pgdata`).
-- `proxy`: Caddy, routing `/api` to `api` and everything else to `web`, on one origin.
+- `proxy`: nginx, routing `/api` to `api` and everything else to `web`, on one origin.
 - `cloudflared`: the Cloudflare Tunnel connector (see below).
 
 **Rules:**
@@ -146,7 +147,7 @@ Antn hosts it on his own machine for now. Everything runs with one `docker compo
 
 **Reaching it from a phone: Cloudflare Tunnel (decided).**
 - `cloudflared` connects out to Cloudflare, started with `CLOUDFLARE_TUNNEL_TOKEN` from `.env`.
-- Public hostname on the tool's own domain (see Domain below), routed by the tunnel to `proxy:80`.
+- Public hostname on the tool's own domain (see Domain below), routed by the tunnel to the proxy's tunnel-only listener `proxy:8081`, the only place Cloudflare's client-address header is trusted (spec 002, research R1).
 - Cloudflare handles HTTPS. Inside the Docker network everything is plain HTTP.
 - No ports are opened on the router. Compose publishes nothing to the internet; for local debugging it binds only to `127.0.0.1`.
 - This gives HTTPS on a fixed address, so the iPhone install prompt, push notifications and sign-in links work, at home and in the shop.
@@ -160,7 +161,7 @@ Antn hosts it on his own machine for now. Everything runs with one `docker compo
 
 ## 13. Roles
 
-Antn is the only admin for now. Proposed split, still to be confirmed:
+Antn is the only admin at launch, and admins can make others admins (spec 002, FR-030; Antn confirmed this reading of the constitution on 2026-11-25). The People part below is settled by spec 002; the rest is still a proposal for the features that build it:
 
 **Everyone (staff):**
 - Dig, swipe For you, use the shop list.
@@ -181,7 +182,7 @@ Antn is the only admin for now. Proposed split, still to be confirmed:
 ## 14. Open questions for Antn and the shop
 
 - Does the shop owner agree to staff purchases going through the API, and to the discount rule as written?
-- Should the shop owner get read-only access to the staff purchases log without being an admin?
+- ~~Should the shop owner get read-only access to the staff purchases log without being an admin?~~ No: two roles only, admin and staff; a further role would be a change to spec 002 (decided 2026-11-25).
 - Is the shelf order simply alphabetical by box code (A01…), or does it need its own list?
 - Which separate domain should the tool use (section 12, Domain)? Or does the shop want to move `rivierarecords.de` DNS from IONOS to Cloudflare?
-- Which email address and SMTP service will send the sign-in links?
+- ~~Which email address and SMTP service will send the sign-in links?~~ IONOS SMTP, from a mailbox on `rivierarecords.de` set as `EMAIL_FROM` (decided 2026-11-25; spec 002, FR-037).
