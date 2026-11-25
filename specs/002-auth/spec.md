@@ -40,6 +40,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: Which email service and sender address should send the sign-in and invite emails? → A: IONOS SMTP, sending from a mailbox on `rivierarecords.de` (for example `dig@rivierarecords.de`).
 - Q: Can an admin remove admin rights from another admin or deactivate them, and can an admin demote or deactivate themself? → A: Admins can demote or deactivate other admins, never themselves; self-removal needs another admin.
 - Q: Should 002 already allow for a read-only role, so the shop owner could see the staff purchases log without being an admin? → A: No. Two roles only, admin and staff; any later role is a change to 002's role model.
+- Q: How should the first admin account (Antn's) be created on a fresh install, when there is no admin yet to send the invite? → A: A one-off host-machine command takes a name and email, creates the admin and sends an invite link; it refuses once any admin exists.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -362,8 +363,10 @@ other out, and check its next request answers 401.
   their staff ID, and a deactivated person MUST NOT be able to sign in.
 - **FR-032**: Every People action (invite, resend, cancel, deactivate, role change) MUST be
   recorded with who did it, to whom, what, and when, identified by staff IDs.
-- **FR-033**: There MUST be a way, run on the host machine only and not reachable over HTTP, to
-  create the first admin when no admin exists. It MUST refuse to run once any admin exists.
+- **FR-033**: There MUST be a one-off command, run on the host machine only and not reachable over
+  HTTP, that takes a name and email address, creates that person as an invited admin and sends
+  them an invite link (FR-002, FR-005). It MUST refuse, changing nothing, once any admin exists
+  (active, invited or deactivated). It MUST NOT print the link or token.
 
 **Request integrity and secrets**
 
