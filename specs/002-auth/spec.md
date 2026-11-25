@@ -38,6 +38,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: How long should a session last, after how much inactivity should it end, and should there be a "remember me" choice? → A: Sessions last 90 days, end after 30 days idle, no remember-me.
 - Q: What limits should apply to requests for sign-in links and to attempts at entering link codes? → A: Link requests 3 per email address per 15 min and 20 per client per hour; a code dies after 5 wrong tries; 10 wrong tries per client per 10 min; no tool-wide cap.
 - Q: Which email service and sender address should send the sign-in and invite emails? → A: IONOS SMTP, sending from a mailbox on `rivierarecords.de` (for example `dig@rivierarecords.de`).
+- Q: Can an admin remove admin rights from another admin or deactivate them, and can an admin demote or deactivate themself? → A: Admins can demote or deactivate other admins, never themselves; self-removal needs another admin.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -232,7 +233,10 @@ other out, and check its next request answers 401.
   routes themselves.
 - A staff member's role changes from admin to staff while they have an admin page open: their
   next admin request answers 403.
-- The last active admin tries to give up admin rights or deactivate themself (see FR-030).
+- An admin tries to demote or deactivate themself: refused, whether or not other admins exist
+  (FR-030). Another admin has to do it.
+- Two admins try to demote each other at the same moment: at most one change applies, so at least
+  one active admin remains.
 - An email address is entered with different letter case or surrounding spaces: it is matched
   to the same person.
 
@@ -344,11 +348,12 @@ other out, and check its next request answers 401.
 - **FR-029**: Admins MUST be able to resend a pending invite (FR-008 applies) and cancel a
   pending invite (its links stop working at once). Neither action applies to an active or
   deactivated person.
-- **FR-030**: Admins MUST be able to make an active staff member an admin. [NEEDS
-  CLARIFICATION: can an admin demote another admin, and can an admin deactivate or demote
-  themself?] Whatever the answer, the tool MUST always keep at least one active admin, and MUST
-  refuse any action that would leave none.
-- **FR-031**: Admins MUST be able to deactivate a person. Deactivation MUST end all their
+- **FR-030**: Admins MUST be able to make an active staff member an admin, and to make another
+  admin a staff member again. An admin MUST NOT be able to demote or deactivate themself: those
+  requests MUST be refused and change nothing, so giving up admin rights always needs another
+  admin. The tool MUST always keep at least one active admin, and MUST refuse any action that
+  would leave none.
+- **FR-031**: Admins MUST be able to deactivate any other person, other admins included (FR-030). Deactivation MUST end all their
   sessions, remove their devices and push subscriptions, and invalidate their outstanding links
   and link codes, all at once. It MUST keep the person's record and everything recorded under
   their staff ID, and a deactivated person MUST NOT be able to sign in.
