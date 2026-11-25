@@ -65,18 +65,48 @@ export function findSuppressions(
 }
 
 /**
- * Image-scan exceptions (constitution Quality Gates, Trivy): Trivy ignore files, and the options
- * that point Trivy at one or skip findings. Unlike the suppressions above these count under ci/
- * too, since that is where the CI scan and its exception files live (PR #52). Only the guard's own
- * source and test may name the options without being flagged.
+ * Image-scan exceptions (constitution Quality Gates, Trivy): Trivy ignore and config files, the
+ * options and variables that point Trivy at an exception (ignore file, policy, VEX, skipped paths)
+ * or change what fails the scan, and `trivy image` commands that no longer fail on HIGH and
+ * CRITICAL. Unlike the suppressions above these count under ci/ too, since that is where the CI
+ * scan and its exception files live (PR #52). Only the guard's own source and test may name them
+ * without being flagged.
  */
 const SCAN_EXCEPTION_FILES: readonly string[] = [
   "**/.trivyignore",
   "**/.trivyignore.*",
+  "**/trivy.yaml",
+  "**/trivy.yml",
+  "**/.trivy.yaml",
+  "**/.trivy.yml",
   "ci/trivy-exceptions/**",
 ];
 const SCAN_EXCEPTION_OPTION =
-  /--ignorefile\b|--ignore-policy\b|--skip-(?:files|dirs)\b|\bTRIVY_(?:IGNOREFILE|IGNORE_POLICY|SKIP_FILES|SKIP_DIRS)\b/;
+  /--ignorefile\b|--ignore-policy\b|--vex\b|--skip-(?:files|dirs)\b|\bTRIVY_(?:IGNOREFILE|IGNORE_POLICY|VEX|SKIP_FILES|SKIP_DIRS|SEVERITY|EXIT_CODE|CONFIG)\b/;
+/** A `trivy image` command (bare, quoted or as `$trivy`), outside a comment. */
+const TRIVY_IMAGE_COMMAND = /(?:^|[\s"'$/{])trivy["'}]?\s+image\b/;
+
+/**
+ * Why an added `trivy image` command is weaker than the gate (fail on HIGH and CRITICAL), or
+ * undefined if it isn't one or keeps the gate.
+ */
+function weakenedScan(text: string): string | undefined {
+  const line = text.trim();
+  if (line.startsWith("#") || line.startsWith("//") || !TRIVY_IMAGE_COMMAND.test(line)) {
+    return undefined;
+  }
+  const severities = (/--severity[ =](\S+)/.exec(line)?.[1] ?? "").split(",");
+  if (!/--exit-code[ =]1\b/.test(line)) {
+    return "Trivy scan without --exit-code 1";
+  }
+  if (!severities.includes("HIGH") || !severities.includes("CRITICAL")) {
+    return "Trivy scan whose --severity leaves out HIGH or CRITICAL";
+  }
+  if (/\s(?:--config|-c)[ =]/.test(line)) {
+    return "Trivy scan with a config file";
+  }
+  return undefined;
+}
 const SCAN_EXCEPTION_SELF: readonly string[] = ["ci/lib/guard.ts", "ci/test/guard.test.ts"];
 
 /** Added or changed Trivy exceptions in a diff: one finding per ignore file, and per option line. */
@@ -92,7 +122,7 @@ export function findScanExceptions(files: readonly FileDiff[]): Violation[] {
         file: file.file,
         line: first.line,
         rule: "scan-exception",
-        text: "Trivy ignore file added or changed",
+        text: "Trivy ignore or config file added or changed",
       });
       continue;
     }
@@ -100,12 +130,13 @@ export function findScanExceptions(files: readonly FileDiff[]): Violation[] {
       continue;
     }
     for (const added of file.added) {
-      if (SCAN_EXCEPTION_OPTION.test(added.text)) {
+      const weakened = weakenedScan(added.text);
+      if (SCAN_EXCEPTION_OPTION.test(added.text) || weakened !== undefined) {
         violations.push({
           file: file.file,
           line: added.line,
           rule: "scan-exception",
-          text: added.text.trim(),
+          text: weakened === undefined ? added.text.trim() : `${weakened}: ${added.text.trim()}`,
         });
       }
     }
