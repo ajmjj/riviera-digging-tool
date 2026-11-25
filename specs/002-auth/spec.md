@@ -36,6 +36,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 
 - Q: How long should a sign-in link stay valid, and how long should an invite link stay valid? → A: Sign-in link 15 minutes; invite link 7 days.
 - Q: How long should a session last, after how much inactivity should it end, and should there be a "remember me" choice? → A: Sessions last 90 days, end after 30 days idle, no remember-me.
+- Q: What limits should apply to requests for sign-in links and to attempts at entering link codes? → A: Link requests 3 per email address per 15 min and 20 per client per hour; a code dies after 5 wrong tries; 10 wrong tries per client per 10 min; no tool-wide cap.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -436,7 +437,8 @@ other out, and check its next request answers 401.
 
 ## Assumptions
 
-- The rate limits of FR-020 and FR-021 are proposals for `/speckit-clarify` to confirm.
+- There is no tool-wide cap on wrong link-code attempts, only the per-code and per-client
+  limits of FR-020 (clarified 2026-11-25).
 - The client a rate limit counts is identified by the connecting address the proxy reports.
   Behind the Cloudflare Tunnel that is Cloudflare's client-address header, trusted only from the
   tunnel; locally, the proxy's view of the client.
