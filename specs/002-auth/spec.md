@@ -43,6 +43,7 @@ address (Principle VII, and 001/FR-004 and 001/FR-005).
 - Q: How should the first admin account (Antn's) be created on a fresh install, when there is no admin yet to send the invite? → A: A one-off host-machine command takes a name and email, creates the admin and sends an invite link; it refuses once any admin exists.
 - Q: Should an admin be able to reactivate a deactivated person, or change a person's email address? → A: Admins can reactivate (fresh invite link, same staff ID and history); email changes stay out of scope.
 - Q: What should an admin be able to see and do about other people's signed-in devices? → A: Admins see each person's device count and can "sign out everywhere" without deactivating, no device names; shown only in the laptop (computer) layout, not on phones.
+- Q: When someone opens a sign-in link, should they have to tap "Confirm sign-in" before they are signed in? → A: Yes: opening the link shows a "Confirm sign-in" button and only tapping it signs in; no automatic confirm by script.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -276,8 +277,9 @@ other out, and check its next request answers 401.
 - **FR-006**: A sign-in or invite link MUST be usable only once. Using it MUST be atomic, so
   that if it is confirmed twice at the same time, exactly one confirmation creates a session.
 - **FR-007**: Opening a link MUST NOT use it up or sign anyone in. It MUST show a confirmation
-  step, and only confirming that step uses the link, so that mail scanners and link previews
-  can't spend it.
+  step with a "Confirm sign-in" button, and only pressing it uses the link, so that mail scanners
+  and link previews can't spend it. The page MUST NOT confirm automatically, by script or
+  otherwise.
 - **FR-008**: Issuing a new sign-in link or invite link for a person MUST invalidate every
   earlier unused link for that person.
 - **FR-009**: A refused link (unknown, altered, expired, used, cancelled, or for a deactivated
