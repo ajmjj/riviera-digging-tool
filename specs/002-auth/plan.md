@@ -74,7 +74,7 @@ Antn (research R8 "Fresh install", R9 "The sample route").
 | Principle / gate | How this plan complies | Status |
 |---|---|---|
 | I. CI is the only path to `main` | Every task is a PR through the existing checks. No new required check: the sign-in smoke step and the security tests run inside existing jobs. | ✅ |
-| II. Never weaken the safety net | No threshold, suppression or ruleset change. Protected paths that implementation tasks will touch: `.github/workflows/ci.yml` (the plain-stack env of R8, the capture mount, adding the `rd[lsp]_` patterns to the bundle scan), `ci/lib/smoke.ts` and a new `ci/lib/sign-in.ts` with `ci/obs-check.ts` using it (R9). Each such task is labelled `needs-human` and says why. This plan PR touches only `specs/002-auth/` and `.env.example`, neither protected; it is `needs-human` because it asks for `approved-exception` (fr-trace, size). | ✅ (exception requested) |
+| II. Never weaken the safety net | No threshold, suppression or ruleset change. Protected paths that implementation tasks will touch: `.github/workflows/ci.yml` (the plain-stack env of R8, the capture mount, adding the `rd[lsp]_` patterns to the bundle scan), `ci/lib/smoke.ts` and a new `ci/lib/sign-in.ts` with `ci/lib/obs-check.ts` and `ci/lib/latency.ts` using it (R9). Each such task is labelled `needs-human` and says why. This plan PR touches only `specs/002-auth/` and `.env.example`, neither protected; it is `needs-human` because it asks for `approved-exception` (fr-trace, size). | ✅ (exception requested) |
 | III. Spec first, fully traceable | Every FR-001…FR-042 maps to at least one named test below; the task PRs write those tests first. Until the last task, `fr-trace` fails on untested 002 FRs, and each PR asks Antn for `approved-exception`. | ✅ |
 | IV. Tests lead and check something | Tests first in every task. The pure rules sit in `apps/api/src/domain/auth/`, so mutation testing and 95%/100% coverage apply (R12), which is stronger than required. Property tests cover email normalization, the rate-limit window, the People rules and the "at least one admin" invariant. No 001 test is weakened; registry and config test updates cite 002/FR-041 and FR-036. | ✅ |
 | V. Small PRs | Tasks are sized at about 400 lines or less. **Deviation**: this plan PR is about 900 lines of planning documents with no code, recorded in the PR for Antn's `approved-exception` as in 001. | ⚠️ deviation recorded |
@@ -143,7 +143,7 @@ proxy/nginx.conf               # client header; tunnel listener 8081; log format
 docker-compose.yml             # edge network; env passthroughs; mail mount via up-dev/CI
 Makefile                       # up-dev: dev secret, test INITIAL_ADMIN_EMAIL, capture dir
 .gitignore                     # .captured-mail/
-ci/lib/sign-in.ts, ci/lib/smoke.ts, ci/obs-check.ts, .github/workflows/ci.yml   # protected
+ci/lib/sign-in.ts, ci/lib/smoke.ts, ci/lib/obs-check.ts, ci/lib/latency.ts, .github/workflows/ci.yml   # protected
 ```
 
 **Structure Decision**: everything stays in the existing workspaces. Auth is api code with its
@@ -222,7 +222,9 @@ captured invite" (R9), in `ci/lib/smoke.ts`.
   breaks.
 - **fr-trace**: fails on every task PR until the last one has tested all 42 FRs; each PR asks
   Antn for `approved-exception` and carries `needs-human`.
-- **Protected paths**: only the CI task(s) touch `ci/**` and `.github/**`, and they say so.
+- **Protected paths**: only T001 (the `ci.yml` environment of R8, which must merge before the
+  config task makes production fail closed) and the CI tasks T034 and T035 touch `ci/**` and
+  `.github/**`, and they say so (tasks.md).
 
 ## Complexity Tracking
 
