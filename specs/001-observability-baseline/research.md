@@ -327,6 +327,12 @@ Phase 0 of `/speckit-plan`. Each entry is a decision the plan depends on. Entrie
   zero-initialised (0 would read as 1970). These instruments are registered at startup and
   exported from their first observation, which is what the clarified FR-014 asks for
   (ajmjj/riviera-digging-tool#10).
+- **Startup flush is bounded** (PR #51): startup waits for this zero-counter flush at most
+  `STARTUP_FLUSH_TIMEOUT_MS` (1 s), then serves, because FR-020 wins over export completeness. With
+  the collector up and answering, the zeros are exported before the first request, as above. With
+  it down, silent or slower than 1 s, they can arrive after the first requests, or (collector
+  down) not at all. A counter series that first appears at a value above 0 can then miss its
+  first increase, which is the case this decision exists to avoid.
 - **Alternatives**: rely on Prometheus created-timestamp ingestion alone (version-dependent,
   and not verifiable until T014); PromQL workarounds such as `or` on the raw series (complex
   and easy to get wrong per panel).

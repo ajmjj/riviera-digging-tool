@@ -31,8 +31,9 @@ const accepted = z.object({ jobId: z.uuid() });
 const REQUESTS = 200;
 const WAIT = { timeout: 15_000 };
 // Startup waits for the zero-counter flush (research R18) at most STARTUP_FLUSH_TIMEOUT_MS, so a
-// collector that is down or silent can't hold `listen` (001/FR-020); migrations take the rest.
-const STARTUP_BOUND_MS = STARTUP_FLUSH_TIMEOUT_MS + 2000;
+// collector that is down or silent can't hold `listen` (001/FR-020). The other 5 s cover
+// migrations on a slow CI runner and still catch the 8-10 s hang this bound replaced (PR #51).
+const STARTUP_BOUND_MS = STARTUP_FLUSH_TIMEOUT_MS + 5000;
 
 let db: FreshDatabase;
 let services: Service[];

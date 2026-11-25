@@ -5,7 +5,7 @@
 //   BASE_SHA=origin/main node ci/guard.ts
 import { readFileSync } from "node:fs";
 import { parseUnifiedDiff } from "./lib/diff.ts";
-import { findSuppressions, loweredThresholds } from "./lib/guard.ts";
+import { findScanExceptions, findSuppressions, loweredThresholds } from "./lib/guard.ts";
 import { labelNames, toLabelEvents } from "./lib/github.ts";
 import { LABELS, verifyLabel } from "./lib/human-gate.ts";
 import { baseRef, git, githubFromEnv, prop, readJson, summary } from "./io.ts";
@@ -67,7 +67,8 @@ function fromGit(base: string): PrView {
 }
 
 const view = prNumber === undefined ? fromGit(baseRef()) : await fromPullRequest(prNumber);
-const suppressions = findSuppressions(parseUnifiedDiff(view.diff));
+const files = parseUnifiedDiff(view.diff);
+const suppressions = [...findSuppressions(files), ...findScanExceptions(files)];
 const lowered = loweredThresholds(view.baseThresholds, view.headThresholds);
 
 const lines: string[] = [];
@@ -79,7 +80,9 @@ for (const problem of lowered) {
 }
 
 if (lines.length === 0) {
-  console.log("Suppression guard: no suppressions added and no thresholds loosened.");
+  console.log(
+    "Suppression guard: no suppressions or scan exceptions added and no thresholds loosened.",
+  );
   summary("**Suppression guard:** clean.");
   process.exit(0);
 }
