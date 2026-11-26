@@ -11,13 +11,25 @@ export interface CapturedEmail extends OutgoingEmail {
   readonly at: string;
 }
 
-const LINK = /https?:\/\/\S+/;
+// The link is the HTML part's one anchor (templates.ts). The name is escaped there, so it can
+// never form an anchor, and a URL typed into a name is never taken for the link.
+const ANCHOR = /<a href="([^"]*)">/;
+
+function unescapeHtml(value: string): string {
+  return value
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&amp;", "&");
+}
 
 function capture(message: OutgoingEmail, at: Date): CapturedEmail {
-  const link = LINK.exec(message.text)?.[0];
-  if (link === undefined) {
+  const href = ANCHOR.exec(message.html)?.[1];
+  if (href === undefined) {
     throw new Error("A captured email must contain its link");
   }
+  const link = unescapeHtml(href);
   const { to, kind, subject, text, html } = message;
   return { to, kind, subject, text, html, link, at: at.toISOString() };
 }

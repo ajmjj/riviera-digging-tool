@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig, type ApiAuthConfig } from "../../src/config.ts";
 import { FileCapture, MemoryCapture } from "../../src/email/capture.ts";
 import type { CreateMailer, SmtpOptions } from "../../src/email/smtp.ts";
+import { renderEmail } from "../../src/email/templates.ts";
 import { createEmailTransport, type OutgoingEmail } from "../../src/email/transport.ts";
 
 const link = "http://localhost:8080/sign-in/confirm#t=rdl_example";
@@ -65,7 +66,15 @@ describe("email transports", () => {
     const capture = new MemoryCapture(() => at);
     await capture.send(message);
     expect(capture.messages).toEqual([{ ...message, link, at: at.toISOString() }]);
-    await expect(capture.send({ ...message, text: "no link" })).rejects.toThrow(/its link/);
+    await expect(capture.send({ ...message, html: "<p>no link</p>" })).rejects.toThrow(/its link/);
+  });
+
+  it("002/FR-037: the captured link is the email's own, even when the name holds a URL", async () => {
+    const capture = new MemoryCapture(() => at);
+    const name = "Mia http://elsewhere.example/?a=1&b=2";
+    const tricky = `${link}&x="y"`;
+    await capture.send(renderEmail({ to: message.to, kind: "invite", name, link: tricky }));
+    expect(capture.messages.map((captured) => captured.link)).toEqual([tricky]);
   });
 
   it("002/FR-037: the file capture writes one <iso-time>-<kind>-<n>.json file per message", async () => {

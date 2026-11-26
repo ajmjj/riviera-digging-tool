@@ -11,7 +11,7 @@ const message: OutgoingEmail = {
   kind: "sign_in",
   subject: "Your Riviera Dig sign-in link",
   text: `Hi Mia,\n\nhttp://localhost:8080/sign-in/confirm#t=rdl_example\n`,
-  html: "<p>Hi Mia,</p>",
+  html: '<p>Hi Mia,</p><p><a href="http://localhost:8080/sign-in/confirm#t=rdl_example">…</a></p>',
 };
 
 function setup(transport: EmailTransport) {
