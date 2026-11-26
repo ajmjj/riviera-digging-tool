@@ -36,8 +36,8 @@ end-to-end check in [quickstart.md](./quickstart.md).
 **Language/Version**: TypeScript 6.0 on Node ≥ 22.18 (type stripping), as in 001.
 
 **Primary Dependencies**: existing Fastify 5.12.8, pg 8.23.1, zod 4.6.7, `@riviera/telemetry`.
-New: `@fastify/cookie` (parsing only, research R3) and `nodemailer` with `@types/nodemailer`
-(SMTP transport, R8). Each is pinned to an exact version by the task that first imports it.
+New: `@fastify/cookie` (parsing only, research R3) and `nodemailer`
+(SMTP transport, R8; it ships its own types, so no `@types/nodemailer`). Each is pinned to an exact version by the task that first imports it.
 HMAC, HKDF and random values come from `node:crypto`. The device-name parser is hand-written
 (R5). The web app adds no framework (R13).
 
