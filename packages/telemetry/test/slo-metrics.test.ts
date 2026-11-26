@@ -22,6 +22,33 @@ const SERVICE_INSTRUMENTS = [
   "riviera.jobs.duration",
 ];
 
+// 002 research R10: the auth counters, which feed no SLO (002/FR-041).
+const AUTH_COUNTERS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
+  "riviera.auth.link_requests": { outcome: ["issued", "not_issued", "rate_limited", "invalid"] },
+  "riviera.auth.sign_ins": {
+    method: ["invite_link", "sign_in_link", "link_code"],
+    outcome: ["success", "refused"],
+  },
+  "riviera.auth.link_code_attempts": { outcome: ["success", "wrong", "rate_limited"] },
+  "riviera.auth.rate_limited": { limit: ["link_address", "link_client", "code_client"] },
+  "riviera.auth.refusals": {
+    reason: ["unauthenticated", "forbidden_role", "csrf_token", "csrf_origin"],
+  },
+  "riviera.auth.emails": { kind: ["invite", "sign_in"], outcome: ["sent", "failed"] },
+  "riviera.auth.people_actions": {
+    action: [
+      "invite",
+      "resend",
+      "cancel",
+      "deactivate",
+      "reactivate",
+      "role_change",
+      "sign_out_everywhere",
+    ],
+    outcome: ["success", "refused"],
+  },
+};
+
 // Latency SLO thresholds in seconds (constitution, Principle VII; contracts/telemetry.md).
 const LATENCY_THRESHOLDS: Readonly<Record<string, number>> = {
   "riviera.verdict.duration": 0.3,
@@ -37,12 +64,23 @@ describe("metric registry", () => {
     expect([...SLO_METRIC_NAMES].sort()).toEqual(requiredMetrics(catalog).sort());
   });
 
-  it("001/FR-014: registers every catalog metric, and only the R6 service metrics besides", () => {
+  it("001/FR-014, 002/FR-041: registers every catalog metric, and only the R6 service metrics and the auth counters besides", () => {
     const names = registry.map((def) => def.name);
     expect(new Set(names).size).toBe(names.length);
     const others = names.filter((name) => !SLO_METRIC_NAMES.includes(name));
-    expect(others.sort()).toEqual([...SERVICE_INSTRUMENTS].sort());
+    expect(others.sort()).toEqual([...SERVICE_INSTRUMENTS, ...Object.keys(AUTH_COUNTERS)].sort());
   });
+
+  it.each(Object.entries(AUTH_COUNTERS))(
+    "002/FR-041: %s is a counter with the closed labels of research R10, feeding no SLO",
+    (name, labels) => {
+      const def = registry.find((d) => d.name === name);
+      expect(def?.kind).toBe("counter");
+      expect(def?.labels).toEqual(labels);
+      expect(def?.slo).toBeUndefined();
+      expect(def?.minimum).toBeUndefined();
+    },
+  );
 
   it("001/FR-014: tags each catalog metric with the SLO it feeds, or as a minimum metric", () => {
     for (const def of registry) {

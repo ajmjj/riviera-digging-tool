@@ -268,6 +268,28 @@ describe("createInstruments", () => {
     }
   });
 
+  it("002/FR-041: after zeroInitialise() each auth counter is exported at 0 for every label combination", async () => {
+    const { instruments, collect } = setup();
+    instruments.zeroInitialise();
+    const metrics = await collect();
+    const auth = registry.filter((d) => d.name.startsWith("riviera.auth."));
+    expect(auth.map((d) => d.kind)).toEqual(Array.from({ length: 7 }, () => "counter"));
+    for (const counter of auth) {
+      const points = metric(metrics, counter.name).dataPoints;
+      const expected = Object.entries(counter.labels).reduce<Record<string, string>[]>(
+        (partials, [key, values]) =>
+          partials.flatMap((partial) =>
+            (values === "route" ? [] : values).map((value) => ({ ...partial, [key]: value })),
+          ),
+        [{}],
+      );
+      expect(points.map((p) => p.attributes)).toEqual(expect.arrayContaining(expected));
+      expect(points).toHaveLength(expected.length);
+      expect(points.every((p) => p.value === 0)).toBe(true);
+    }
+    expect(metric(metrics, "riviera.auth.people_actions").dataPoints).toHaveLength(14);
+  });
+
   it("001/FR-014: histograms are exported from their first observation", async () => {
     const { instruments, collect } = setup();
     instruments.zeroInitialise();
