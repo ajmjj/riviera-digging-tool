@@ -172,3 +172,86 @@ describe("collector config", () => {
     }
   });
 });
+
+describe("auth settings in compose, the Makefile and CI (002, research R8)", () => {
+  const API_ONLY = ["SMTP_URL", "EMAIL_FROM", "INITIAL_ADMIN_EMAIL", "INITIAL_ADMIN_NAME"];
+  const makefile = readFileSync("Makefile", "utf8");
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+  const capture = readYaml("docker-compose.capture.yml");
+  const captureServices = record(capture["services"], "capture services");
+  const captureApi = record(captureServices["api"], "capture api");
+  const upDevLines = makefile.split("\n").filter((line) => line.startsWith("up-dev:"));
+
+  it("002/FR-036: the session secret reaches api and worker from .env only, empty by default", () => {
+    for (const name of ["api", "worker"]) {
+      expect(environment(name)["SESSION_SECRET"], name).toBe("${SESSION_SECRET:-}");
+    }
+  });
+
+  it("002/FR-036: SMTP, sender and first-admin settings reach only the api, empty by default", () => {
+    for (const setting of API_ONLY) {
+      expect(environment("api")[setting], setting).toBe(`\${${setting}:-}`);
+      expect(environment("worker")[setting], setting).toBeUndefined();
+    }
+  });
+
+  it("002/FR-038: no compose file, Makefile target or CI step sets SMTP_URL", () => {
+    // Only the api passes the operator's own value through; no service sets one.
+    for (const name of serviceNames) {
+      const env = service(name)["environment"];
+      const value = isRecord(env) ? env["SMTP_URL"] : undefined;
+      expect(value, name).toBe(name === "api" ? "${SMTP_URL:-}" : undefined);
+    }
+    expect(readFileSync("docker-compose.capture.yml", "utf8")).not.toContain("SMTP_URL");
+    // Any assignment: `SMTP_URL=`, `SMTP_URL :=` or a YAML `SMTP_URL:`.
+    const assignment = /\bSMTP_URL\s*(?::?=|:)/;
+    expect(makefile).not.toMatch(assignment);
+    expect(ci).not.toMatch(assignment);
+  });
+
+  it("002/FR-038: email capture is mounted only by docker-compose.capture.yml, on the api only", () => {
+    expect(Object.keys(captureServices)).toEqual(["api"]);
+    expect(record(captureApi["environment"], "capture api environment")).toEqual({
+      EMAIL_CAPTURE_DIR: "/var/lib/riviera/mail",
+    });
+    expect(strings(captureApi["volumes"])).toEqual(["./.captured-mail:/var/lib/riviera/mail"]);
+    for (const name of serviceNames) {
+      const env = service(name)["environment"];
+      expect(isRecord(env) ? env["EMAIL_CAPTURE_DIR"] : undefined, name).toBeUndefined();
+      const mounts = strings(service(name)["volumes"]);
+      expect(mounts.join(" "), name).not.toContain("/var/lib/riviera/mail");
+    }
+  });
+
+  it("002/FR-038: up-dev captures email as development with the placeholder secret; up does not", () => {
+    expect(upDevLines).toEqual([
+      "up-dev: export COMPOSE_FILE := docker-compose.yml:docker-compose.capture.yml",
+      "up-dev: export SESSION_SECRET := dev-only-session-secret-0000000000000000",
+      "up-dev: export INITIAL_ADMIN_EMAIL := admin@dev.invalid",
+      "up-dev: export DEPLOYMENT_ENVIRONMENT := development",
+      "up-dev: env captured-mail ## Start the stack with the dev (mocks, sample flows) and observability profiles",
+    ]);
+    expect(makefile).toMatch(
+      /^captured-mail:.*\n\trm -rf \.captured-mail\n\tmkdir -p \.captured-mail$/m,
+    );
+    expect(makefile).not.toMatch(/^up:.*capture/m);
+    expect(makefile.match(/docker-compose\.capture\.yml/g)).toHaveLength(1);
+  });
+
+  it("002/FR-038: the CI stack job captures email and never runs as production", () => {
+    expect(ci).toContain("COMPOSE_FILE: docker-compose.yml:docker-compose.capture.yml");
+    expect(ci).toContain("APP_URL: http://localhost:8080");
+    expect(ci).toContain("E2E_BASE_URL: http://localhost:8080");
+    expect(ci).toContain("INITIAL_ADMIN_EMAIL: admin@ci.invalid");
+    // Both stack-ups: the plain one and the one with the dev and observability profiles.
+    expect(ci.match(/DEPLOYMENT_ENVIRONMENT: ci$/gm)).toHaveLength(2);
+    expect(ci.match(/SESSION_SECRET: dev-only-session-secret-0{16}$/gm)).toHaveLength(2);
+    expect(ci.match(/sudo chown 1000:1000 \.captured-mail$/gm)).toHaveLength(2);
+  });
+
+  it("002/FR-036: captured mail and the CI session file are never committed", () => {
+    const ignored = readFileSync(".gitignore", "utf8").split("\n");
+    expect(ignored).toContain(".captured-mail/");
+    expect(ignored).toContain(".ci-session/");
+  });
+});
