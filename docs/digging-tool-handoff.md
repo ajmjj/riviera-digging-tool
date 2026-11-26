@@ -27,7 +27,7 @@ An internal tool that lets Riviera Records staff listen through the shop's ~20,0
 - `session`, `magic_link`, `device(staff_id, name, last_seen, push_subscription)`, `link_code` (6 digits, 10-minute expiry). Tokens and codes are stored only as keyed hashes, never as sent.
 - Auth is specified in `specs/002-auth/` (spec and `data-model.md`), which wins over this sketch.
 - `record(listing_id, item_id, listing_ref, discogs_release_id, artist, title, label, catno, year, styles[], genres[], condition, list_price, location /*box*/, has_snippet, cg_snippet_uris[], cg_video_uris[], status, posted, synced_at)`
-- `box(code, genre_label, sort_order)`. The shelf order comes from the box code, unless a config overrides it.
+- `box(code, genre_label, sort_order, diggable)`. `code` is the Common Ground location name (for example `Techno Keller 12`; there are no A01-style codes). By default the shelf order is the names in natural order: compared by character code (so capitals sort before lower case), with runs of digits compared as numbers (`High Price 9` before `High Price 10`). That gives exactly the shop's location list as of 2026-11-26 (283 locations, from `7"` to `UK Bass Keller 3`), but that list is only a snapshot: more locations will be added in Common Ground. The admin can override the order. `diggable` is set by the admin; records in a box that isn't diggable never appear in Dig or For you. When sync finds a new location it becomes a box that is diggable straight away, and it takes its place by the name rule among the existing boxes, even where the admin has moved boxes by hand (for example `Techno Keller 44` lands right after `Techno Keller 43`). Likely candidates for switching off: `Archiv / Verkauft`, `Clone Backstock`, `Pascal Feos Backstock`, `PROMO` and the `Promo Keller` boxes.
 - `verdict(staff_id, listing_id, value[pass|maybe|want|noaudio], created_at, source[box|foryou|shoplist])`. There is one current verdict per staff member per record, and every change is logged so undo works.
 - `dig_position(staff_id, box_code, index)`
 - `taste_profile(staff_id, weights jsonb, signatures text[], updated_at)` and `discogs_collection(staff_id, release_id)`
@@ -154,8 +154,10 @@ Antn hosts it on his own machine for now. Everything runs with one `docker compo
 - Access stays invite-only through the tool's own magic-link sign-in. Optionally, put Cloudflare Access (email one-time code) in front of `/admin` as a second lock.
 - `APP_URL` in `.env` is the public hostname. Sign-in links, the PWA manifest and the push setup all use it.
 - **Domain:** `rivierarecords.de` is registered and its DNS is hosted at IONOS. Cloudflare's free plan can only run a tunnel hostname on a domain whose nameservers point to Cloudflare. Keeping IONOS DNS and only routing one subdomain through Cloudflare needs the Business plan or higher.
-  - **Recommended:** register a small separate domain for the tool (it can be bought at IONOS) and point *its* nameservers to Cloudflare (free plan). The shop's website and email on `rivierarecords.de` are untouched.
-  - **Alternative:** move `rivierarecords.de` nameservers from IONOS to Cloudflare (the domain stays registered at IONOS), after copying every existing record, especially the website and MX/email records. Only with the shop owner's OK, since a mistake takes down the site or email.
+  - **Decided (2026-11-26):** register a small separate domain for the tool (it can be bought at IONOS) and point *its* nameservers to Cloudflare (free plan). The tunnel hostname, `APP_URL`, sign-in links, session cookies and the PWA all live on that domain. The shop's website and email on `rivierarecords.de` are untouched, and its DNS stays at IONOS.
+  - **Convenience redirect:** set up an IONOS domain forward from `dig.rivierarecords.de` to the tool's domain, so staff can type the familiar address. It is only a redirect: nothing is served or signed in on `rivierarecords.de`. Not yet checked: that IONOS offers this forwarding over HTTPS (it needs a certificate for the subdomain at IONOS); if it only forwards plain HTTP, the redirect still works when typed but browsers may warn.
+  - **Not chosen:** moving `rivierarecords.de` nameservers to Cloudflare. It would risk the shop's website and email for no gain over the above.
+  - Still to do: pick and register the domain name, then set `APP_URL` and add the tunnel.
 
 **Uptime:** the tool is only available while the host machine is on. The worker catches up on missed syncs when it starts.
 
@@ -171,7 +173,7 @@ Antn is the only admin at launch, and admins can make others admins (spec 002, F
 
 **Admin, in addition:**
 - **People:** invite colleagues, resend or cancel invites, deactivate an account, and make someone else an admin. Deactivating keeps their history but signs them out of every device.
-- **Shop settings:** the staff price rule (percentages, the €20 threshold, the €5 minimum), box shelf order and box names, and the shift days used for shop-list reminders.
+- **Shop settings:** the staff price rule (percentages, the €20 threshold, the €5 minimum), box shelf order, box names and which boxes are dug, and the shift days used for shop-list reminders.
 - **Staff purchases:** a log of every staff checkout made through the tool: who bought what, the Common Ground order, list vs staff total, and payment method. This is for the shop's books.
 - **Sync health:** last nightly and light sync, errors, Common Ground rate-limit use, and a "sync now" button.
 
@@ -181,8 +183,8 @@ Antn is the only admin at launch, and admins can make others admins (spec 002, F
 
 ## 14. Open questions for Antn and the shop
 
-- Does the shop owner agree to staff purchases going through the API, and to the discount rule as written?
+- ~~Does the shop owner agree to staff purchases going through the API, and to the discount rule as written?~~ Yes, both as written in sections 6 and 9 (decided 2026-11-26).
 - ~~Should the shop owner get read-only access to the staff purchases log without being an admin?~~ No: two roles only, admin and staff; a further role would be a change to spec 002 (decided 2026-11-25).
-- Is the shelf order simply alphabetical by box code (A01…), or does it need its own list?
-- Which separate domain should the tool use (section 12, Domain)? Or does the shop want to move `rivierarecords.de` DNS from IONOS to Cloudflare?
+- ~~Is the shelf order simply alphabetical by box code (A01…), or does it need its own list?~~ Neither: boxes are Common Ground location names, and the shelf order is those names in natural order, which the admin can override. Not every location is a box to dig, so the admin also switches digging on or off per box in shop settings (decided 2026-11-26; section 3, `box`).
+- ~~Which separate domain should the tool use (section 12, Domain)? Or does the shop want to move `rivierarecords.de` DNS from IONOS to Cloudflare?~~ A separate domain with its nameservers on Cloudflare, plus an IONOS forward from `dig.rivierarecords.de` to it; `rivierarecords.de` DNS stays at IONOS (decided 2026-11-26; section 12, Domain). Still to do: pick and register the domain name, and check that IONOS can forward that subdomain over HTTPS.
 - ~~Which email address and SMTP service will send the sign-in links?~~ IONOS SMTP, from a mailbox on `rivierarecords.de` set as `EMAIL_FROM` (decided 2026-11-25; spec 002, FR-037).
