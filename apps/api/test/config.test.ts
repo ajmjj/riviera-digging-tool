@@ -471,6 +471,9 @@ describe("002/FR-033: first admin settings", () => {
         .apiAuth?.initialAdmin;
     expect(admin(" Antn ")).toEqual({ email: "a@b.invalid", name: "Antn" });
     expect(admin(undefined)).toEqual({ email: "a@b.invalid", name: undefined });
+    // The 1-character minimum: an empty or whitespace-only name counts as unset (R8).
+    expect(admin("")).toEqual({ email: "a@b.invalid", name: undefined });
+    expect(admin("   ")).toEqual({ email: "a@b.invalid", name: undefined });
     expect(admin("é".repeat(80))).toEqual({ email: "a@b.invalid", name: "é".repeat(80) });
     expect(admin("👩‍👩‍👧".repeat(80))).toMatchObject({ name: "👩‍👩‍👧".repeat(80) });
   });
