@@ -28,6 +28,8 @@ skip it makes every other rule optional.
   - test, coverage, diff-coverage and mutation thresholds (`ci/thresholds.json`)
   - formatter, lint, type-checker, test-runner and security-scanner configuration
   - this constitution (`.specify/memory/constitution.md`)
+  - every feature spec (`specs/**/spec.md`), so Human Checkpoint 2 is enforced by the
+    human gate and not only by `fr-trace` failing on untested FRs
 
   The authoritative list is `ci/protected-paths.json`, which is itself protected.
 - **Suppression guard.** CI MUST fail any PR that adds any of the following, unless Antn
@@ -293,4 +295,4 @@ either label.
   `approved-exception` label from Antn, recorded in the PR.
 - Runtime guidance for agents lives in `CLAUDE.md`, and it MUST NOT contradict this file.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-23 | **Last Amended**: 2026-11-23
+**Version**: 1.2.0 | **Ratified**: 2026-11-23 | **Last Amended**: 2026-11-26

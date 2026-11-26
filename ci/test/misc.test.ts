@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { renderCodeowners, toCodeownersPattern } from "../lib/codeowners.ts";
+import { matchesAny } from "../lib/diff.ts";
 import { selectChangedTests } from "../lib/flake.ts";
 import { missingMetrics, parseCatalog, requiredMetrics } from "../lib/slo.ts";
 import { runSmoke, SMOKE_STEPS } from "../lib/smoke.ts";
@@ -29,6 +30,7 @@ describe("CODEOWNERS", () => {
     expect(toCodeownersPattern(".github/**")).toBe("/.github/");
     expect(toCodeownersPattern("**/tsconfig*.json")).toBe("**/tsconfig*.json");
     expect(toCodeownersPattern("CODEOWNERS")).toBe("/CODEOWNERS");
+    expect(toCodeownersPattern("specs/**/spec.md")).toBe("/specs/**/spec.md");
   });
 
   it("stays in sync with ci/protected-paths.json (run node ci/render-codeowners.ts)", () => {
@@ -50,6 +52,18 @@ describe("CODEOWNERS", () => {
     const text = readFileSync("ci/protected-paths.json", "utf8");
     for (const path of [".github/**", "ci/**", "CODEOWNERS", ".specify/**", "eslint.config.js"]) {
       expect(text).toContain(`"${path}"`);
+    }
+  });
+
+  it("protects every feature spec, but not its plan or tasks (Human Checkpoint 2)", () => {
+    const config: unknown = JSON.parse(readFileSync("ci/protected-paths.json", "utf8"));
+    const paths: unknown = Reflect.get(Object(config), "paths");
+    expect(Array.isArray(paths) && paths.every((p) => typeof p === "string")).toBe(true);
+    if (Array.isArray(paths) && paths.every((p) => typeof p === "string")) {
+      expect(matchesAny("specs/002-auth/spec.md", paths)).toBe(true);
+      expect(matchesAny("specs/123-new-feature/spec.md", paths)).toBe(true);
+      expect(matchesAny("specs/002-auth/tasks.md", paths)).toBe(false);
+      expect(matchesAny("specs/002-auth/plan.md", paths)).toBe(false);
     }
   });
 });
