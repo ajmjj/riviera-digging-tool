@@ -107,6 +107,16 @@ jobs:
     name: stack
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # 002 (research R8, task T001). Every compose call in this job adds the email capture file, so
+    # the api writes sign-in emails to ./.captured-mail/ and never sends one; SMTP_URL is never set.
+    # Browsers and the sign-in helpers use the APP_URL origin (from T009 a request from
+    # 127.0.0.1 has a foreign Origin and gets 403). INITIAL_ADMIN_EMAIL is the CI first admin, read by
+    # compose at both stack-ups and by the sign-in helpers of later tasks.
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.capture.yml
+      APP_URL: http://localhost:8080
+      E2E_BASE_URL: http://localhost:8080
+      INITIAL_ADMIN_EMAIL: admin@ci.invalid
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -139,9 +149,18 @@ jobs:
         run: |
           cp .env.example .env
           docker compose --profile dev --profile observability build
+      # The plain stack runs as `ci`, not production: production refuses to start without real
+      # SMTP settings (002/FR-036). The session secret is the fixed dev placeholder.
       - name: Stack comes up with every healthcheck green within the limit
+        env:
+          DEPLOYMENT_ENVIRONMENT: ci
+          SESSION_SECRET: dev-only-session-secret-0000000000000000
         run: |
           limit=$(jq -r .composeStartupSeconds ci/thresholds.json)
+          # Fresh capture directory, writable by the api's `node` user (uid 1000, not the runner's).
+          sudo rm -rf .captured-mail
+          mkdir .captured-mail
+          sudo chown 1000:1000 .captured-mail
           docker compose up --detach --wait --wait-timeout "$limit"
           docker compose ps
       - name: Smoke test
@@ -173,9 +192,13 @@ jobs:
           COMMON_GROUND_URL: http://mocks:4000
           DISCOGS_URL: http://mocks:4000
           COMMON_GROUND_DEV_API_KEY: dev-only-mock-key
+          SESSION_SECRET: dev-only-session-secret-0000000000000000
         run: |
           limit=$(jq -r .composeStartupSeconds ci/thresholds.json)
           docker compose down --volumes
+          sudo rm -rf .captured-mail
+          mkdir .captured-mail
+          sudo chown 1000:1000 .captured-mail
           docker compose --profile dev --profile observability up --detach --wait --wait-timeout "$limit"
           docker compose --profile dev --profile observability ps
       # The proxy re-resolves the recreated api and web (PR #45); this is its end-to-end check.

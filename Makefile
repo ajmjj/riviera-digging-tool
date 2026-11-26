@@ -1,4 +1,4 @@
-.PHONY: help env up down logs ps smoke check test-integration up-observability up-dev down-observability dashboards
+.PHONY: help env up down logs ps smoke check test-integration up-observability up-dev down-observability dashboards captured-mail
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -23,9 +23,21 @@ SAMPLE_FLOWS := SAMPLE_FLOWS_ENABLED=true DEPLOYMENT_ENVIRONMENT=development \
 up-observability: env ## Start the stack with the observability profile, exporting telemetry
 	$(OTLP_ENDPOINT) docker compose --profile observability up --build --detach --wait --wait-timeout 120
 
-up-dev: env ## Start the stack with the dev (mocks, sample flows) and observability profiles
+# 002 (research R8): the dev stack captures email instead of sending it, with a fixed
+# placeholder session secret (never a real one) and a dev first admin. SMTP_URL is never set.
+up-dev: export COMPOSE_FILE := docker-compose.yml:docker-compose.capture.yml
+up-dev: export SESSION_SECRET := dev-only-session-secret-0000000000000000
+up-dev: export INITIAL_ADMIN_EMAIL := admin@dev.invalid
+up-dev: export DEPLOYMENT_ENVIRONMENT := development
+up-dev: env captured-mail ## Start the stack with the dev (mocks, sample flows) and observability profiles
 	$(OTLP_ENDPOINT) $(SAMPLE_FLOWS) docker compose --profile dev --profile observability \
 		up --build --detach --wait --wait-timeout 120
+
+# The api container runs as `node` (uid 1000). On Linux, if your uid differs, make the directory
+# writable for it (for example `sudo chown 1000 .captured-mail`).
+captured-mail: ## Empty the captured-email directory (contracts/email.md)
+	rm -rf .captured-mail
+	mkdir -p .captured-mail
 
 down-observability: ## Stop the stack and both profiles (keeps volumes; add --volumes to discard telemetry)
 	docker compose --profile dev --profile observability down

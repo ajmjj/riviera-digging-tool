@@ -25,6 +25,9 @@ x-node-service: &node-service
     DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-production}
     COMMON_GROUND_URL: ${COMMON_GROUND_URL:-}
     DISCOGS_URL: ${DISCOGS_URL:-}
+    # Auth (002, research R8): from .env only, empty by default, so nothing secret is committed.
+    # The api and the worker share one config loader, so both need the session secret.
+    SESSION_SECRET: ${SESSION_SECRET:-}
 
 services:
   db:
@@ -56,6 +59,13 @@ services:
       # Only the api calls Common Ground. `make up-dev` sets a dev value
       # (specs/001-observability-baseline/notes.md).
       COMMON_GROUND_DEV_API_KEY: ${COMMON_GROUND_DEV_API_KEY:-}
+      # Auth email (002, research R8), api only. SMTP_URL is for production alone (002/FR-038):
+      # no Makefile target or CI step sets it. Email capture is added by
+      # docker-compose.capture.yml, never here.
+      SMTP_URL: ${SMTP_URL:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-}
     healthcheck:
       test:
         - CMD

@@ -1,0 +1,12 @@
+# Email capture for development and CI only (002, research R8, contracts/email.md). Added on top
+# of docker-compose.yml by `make up-dev` and by CI's stack job (COMPOSE_FILE), never by `make up`.
+# The api writes one JSON file per message to /var/lib/riviera/mail, which is ./.captured-mail/
+# on the host (gitignored), so the e2e tests, the smoke test and developers can read the link.
+# Nothing is sent: the capture transport never opens a network connection.
+
+services:
+  api:
+    environment:
+      EMAIL_CAPTURE_DIR: /var/lib/riviera/mail
+    volumes:
+      - ./.captured-mail:/var/lib/riviera/mail
