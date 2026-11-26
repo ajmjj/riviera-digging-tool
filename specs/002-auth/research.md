@@ -222,6 +222,11 @@ being written are marked **(decided)**.
   | `EMAIL_FROM` | required, an address whose domain is exactly `rivierarecords.de` (no subdomains) | optional; defaults to `dev-capture@localhost.invalid` |
   | `INITIAL_ADMIN_EMAIL` | optional; if set, must be an email address | same |
   | `INITIAL_ADMIN_NAME` | optional, 1–80 characters | same |
+  | `EMAIL_CAPTURE_DIR` | **must be empty** (nothing is captured in production) | optional; when set, the capture transport writes one file per message there, otherwise it keeps messages in memory. Set only by `docker-compose.capture.yml` (`/var/lib/riviera/mail`), never in `.env.example` |
+
+  `SESSION_SECRET` is checked for the api and the worker alike: both start from one image and one
+  `loadConfig` (001), so one rule covers both. No worker code uses it in 002. `SMTP_URL`,
+  `EMAIL_FROM`, `EMAIL_CAPTURE_DIR` and the first-admin settings are api only.
 
 - **Fresh install (decided)**: Antn chose *fail closed*. An unset `DEPLOYMENT_ENVIRONMENT` still
   means production (001 R17), so `cp .env.example .env && make up` refuses to start until the
@@ -254,12 +259,25 @@ being written are marked **(decided)**.
   except `last_seen_at` and ended-session cleanup) and `response-secrets.int.test.ts` (FR-027 and
   FR-035: every served route as visitor, staff and admin; the bodies and headers are scanned
   with 001's `isSecretName` for keys and with prefixed-token, 64-hex and `Discogs token=`
-  patterns for values). `csrfToken` is the one allowed key, on `GET /auth/csrf` and `GET /me`.
-  The session cookie is allowed in `Set-Cookie` only.
+  patterns for values). `csrfToken` is the one allowed key, on `GET /auth/csrf`, `GET /me`,
+  `POST /auth/links/confirm` and `POST /auth/codes/redeem` (contracts/http.md). The session cookie
+  is allowed in `Set-Cookie` only. The response-secret and planted-value suites are written with
+  the route inventory, before the routes they scan (decided by Antn, 2026-11-25), so every route
+  is scanned in the PR that adds it.
 - **The sample route (decided)**: Antn chose that 001's `POST /sample/trace` follows 002. It is
   `staff` access and needs CSRF. A shared CI helper, `ci/lib/sign-in.ts`, signs in as the
   bootstrap admin from the captured invite and is used by both `ci/obs-check.ts` and the
   sign-in smoke step. That touches `ci/**` (protected, needs-human). No exception is needed.
+- **One shared admin session in CI** (added after the analysis review): the CI helper and the
+  e2e fixture keep the bootstrap admin's session cookie and CSRF token in one gitignored file,
+  `.ci-session/admin.json`, behind an exclusive lock file `.ci-session/admin.lock`. They sign in
+  in one order: the stored session while `GET /api/me` answers 200, else the newest unused
+  bootstrap invite (polled for up to 10 seconds, since it is sent after `listen`), else one
+  sign-in link. They read `APP_URL` (for the `Origin` they send) and `INITIAL_ADMIN_EMAIL` from the
+  environment, which the `stack` job sets at job level. No e2e test ends that session; each acts
+  on its own invitee. So each fresh database costs at most one sign-in link for the admin address
+  (limit 3 per 15 minutes), and e2e with its flake-guard repeats stays well under 20 link
+  requests per client per hour.
 
 ## R10. Auth telemetry with bounded labels (FR-040, FR-041)
 
@@ -286,8 +304,9 @@ being written are marked **(decided)**.
   `\brd[lsp]_[A-Za-z0-9_-]{20,}` become `[REDACTED]`. Email addresses are already redacted by
   value. Names, link codes and push endpoints can't be recognised by shape, so the rule for them
   is that they are never passed to a logger or span. The planted-value test enforces this.
-- **Planted-value test** (FR-040, SC-006): `telemetry-planted.int.test.ts` runs every auth flow
-  with distinctive values: an email, a name, the link token, the code, the session cookie, the
+- **Planted-value test** (FR-040, SC-006): `telemetry-planted.int.test.ts` sends every served
+  route's sample request from the route inventory (R9), then runs the auth flows that need a
+  sequence (wrong codes up to the limit, People actions, the bootstrap), with distinctive values: an email, a name, the link token, the code, the session cookie, the
   CSRF token, a push endpoint, a client IP address and a User-Agent string. It collects stdout log lines and 001's in-memory spans,
   span events and metric points, and asserts that none of the planted strings appears.
 
@@ -373,9 +392,15 @@ neither and leaves the call to Antn.
   - `X-Frame-Options: DENY`, for older browsers
   - `Referrer-Policy: no-referrer`
   - `X-Content-Type-Options: nosniff`
+- **One copy of each header**: in the `/api/` blocks the proxy first `proxy_hide_header`s the
+  api's four headers and then adds its own, so a response through the proxy carries each exactly
+  once and still has them when the api is down (a 502 from nginx). The headers are written in
+  every answering `location` block, because nginx drops server-level `add_header` lines in a
+  block that sets any of its own.
 - Later features that embed YouTube (handoff §5) extend `frame-src` in their own spec.
-- **Tests**: a static test of `proxy/nginx.conf`, an api test over every served route (from the
-  route inventory, R9), and an e2e check of the pages' headers.
+- **Tests**: a static test of `proxy/nginx.conf` (every answering `location`, and the hide lines
+  in `/api/`), an api test over every served route (from the route inventory, R9), and an e2e
+  check that pages and api responses carry each header exactly once.
 - **Alternatives**: `@fastify/helmet` (more defaults than we want, and the PWA's headers would
   still have to come from nginx); CSP in a `<meta>` tag (can't set `frame-ancestors`).
 

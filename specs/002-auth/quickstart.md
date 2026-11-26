@@ -10,6 +10,11 @@ How to check 002 end to end once its tasks have merged. The routes are in
 - **Development** needs no real settings: `make up-dev` passes the dev placeholder
   `SESSION_SECRET`, a test `INITIAL_ADMIN_EMAIL` (`admin@dev.invalid`) and the capture
   directory, with `DEPLOYMENT_ENVIRONMENT=development`.
+- **e2e and the CI helpers locally** (`pnpm e2e`, `node ci/smoke.ts`): they sign in as the
+  bootstrap admin and read `APP_URL` and `INITIAL_ADMIN_EMAIL` from the environment, as the CI
+  `stack` job sets them. Against `make up-dev`, run them with
+  `APP_URL=http://localhost:8080 INITIAL_ADMIN_EMAIL=admin@dev.invalid`, and
+  `E2E_BASE_URL=http://localhost:8080` for Playwright (research R9).
 - **Antn's host** (production): fill `SESSION_SECRET` (for example `openssl rand -base64 48`),
   `SMTP_URL`, `EMAIL_FROM` and `INITIAL_ADMIN_EMAIL` in `.env`. Without them `make up` refuses
   to start and names the missing setting. This is intended (research R8).
