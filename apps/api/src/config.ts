@@ -53,7 +53,7 @@ interface LoadedConfig extends Config {
   readonly apiAuth: ApiAuthConfig | undefined;
 }
 
-type EmailTransportConfig =
+export type EmailTransportConfig =
   | {
       readonly kind: "smtp";
       readonly host: string;
@@ -70,7 +70,7 @@ type EmailTransportConfig =
       readonly dir: string | undefined;
     };
 
-interface ApiAuthConfig {
+export interface ApiAuthConfig {
   readonly emailFrom: string;
   readonly emailTransport: EmailTransportConfig;
   readonly initialAdmin: { readonly email: string; readonly name: string | undefined } | undefined;
