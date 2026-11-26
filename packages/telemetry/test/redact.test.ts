@@ -94,6 +94,51 @@ describe("redaction of planted values (property)", () => {
     );
   });
 
+  // 002 research R10: link, session and push tokens, assembled at runtime as above.
+  const tokenPrefix = fc.constantFrom("rdl", "rds", "rdp");
+  const rivieraToken = fc
+    .tuple(tokenPrefix, fc.stringMatching(/^[A-Za-z0-9_-]{20,48}$/))
+    .map((parts) => parts.join("_"));
+
+  it("002/FR-040: an rdl_, rds_ or rdp_ token anywhere in arbitrary JSON never survives", () => {
+    const leaf = fc.oneof(
+      rivieraToken.map((t) => ({ value: t, secret: t })),
+      // inside free text, a link, a cookie header or a quoted value
+      fc
+        .tuple(rivieraToken, surround, fc.constantFrom(" ", "/#t=", "; rd_session=", '"'))
+        .map(([t, [before, after], sep]) => ({ value: `${before}${sep}${t} ${after}`, secret: t })),
+      // inside a field name
+      fc.tuple(rivieraToken, surround, fc.jsonValue({ maxDepth: 1 })).map(([t, [before], v]) => ({
+        value: { [`${before} ${t}`]: v },
+        secret: t,
+      })),
+    );
+    fc.assert(
+      fc.property(leaf, fc.array(wrapper, { maxLength: 4 }), ({ value, secret }, wraps) => {
+        const output = JSON.stringify(sanitize(nested(value, wraps)));
+        expect(output).not.toContain(secret);
+      }),
+    );
+  });
+
+  it("002/FR-040: short look-alikes such as rdl_x stay unchanged", () => {
+    const shortToken = fc
+      .tuple(tokenPrefix, fc.stringMatching(/^[A-Za-z0-9]{1,19}$/))
+      .map((parts) => parts.join("_"));
+    expect(redactText("see rdl_x now")).toBe("see rdl_x now");
+    // The boundary: 19 characters after the prefix stay, 20 are a token.
+    const at = (n: number): string => ["rds", "a".repeat(n)].join("_");
+    expect(redactText(`see ${at(19)} now`)).toBe(`see ${at(19)} now`);
+    expect(redactText(`see ${at(20)} now`)).toBe(`see ${REDACTED} now`);
+    fc.assert(
+      fc.property(shortToken, fc.constantFrom(" ", "/#t=", "(", '"'), (t, sep) => {
+        const text = `page${sep}${t} ok`;
+        expect(redactText(text)).toBe(text);
+        expect(redact({ note: text })).toEqual({ note: text });
+      }),
+    );
+  });
+
   // Field names as word lists; each is written in every case style of 001/FR-005.
   const SECRET_NAMES = [
     "admin key|common ground admin key|private key|access key|x api key|client secret",

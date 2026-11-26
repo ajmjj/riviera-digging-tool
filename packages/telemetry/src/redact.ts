@@ -79,10 +79,15 @@ const BASIC = /\bBasic\s+(?!Basic\b)([A-Za-z0-9+/]+={0,2})(?![A-Za-z0-9+/=])/gi;
 const PARAM_NAME = /(?<=^|[?&;,\s=#/:([{"'])(["']?)[\w.-]{1,128}\1(?:=|\s=\s?|\s?:\s?)/g;
 const PARAM_VALUE_END = /[\s&#,;"'<>)\]}]/g;
 const LINE_END = /[\r\n]/g;
+// 002 research R10: the tool's own link, session and push tokens (`rdl_`, `rds_`, `rdp_`), found
+// by shape wherever they appear. Replaced before emails, so an `@` just before a token can't
+// leave the token's tail behind. Linear: a match can't restart inside an earlier one.
+const RIVIERA_TOKEN = /\brd[lsp]_[A-Za-z0-9_-]{20,}/g;
 
-/** Redacts emails, bearer/basic credentials and secret-named parameters in free text. */
+/** Redacts emails, the tool's tokens, bearer/basic credentials and secret-named parameters. */
 export function redactText(text: string): string {
   const redacted = text
+    .replace(RIVIERA_TOKEN, REDACTED)
     .replace(EMAIL, REDACTED)
     .replace(BEARER, REDACTED)
     .replace(BASIC, (match: string, encoded: string) =>

@@ -1,6 +1,7 @@
 // Metric registry (specs/001-observability-baseline/data-model.md §3). Every instrument the
 // api and worker register is defined here, once: the SLO catalog's metrics
-// (ci/slo-catalog.json) and the service metrics of research R6. `ci/slo-check.ts` imports
+// (ci/slo-catalog.json), the service metrics of research R6 and the auth counters of 002 research
+// R10 (not SLO metrics, so the catalog is unchanged). `ci/slo-check.ts` imports
 // SLO_METRIC_NAMES with plain `node`, so this file has no runtime imports.
 
 /** Label values: a closed list, or "route" (the registered route templates plus `unmatched`). */
@@ -27,6 +28,7 @@ const EXTERNAL_OUTCOME = ["success", "failed", "rate_limited"] as const;
 const JOB_NAME = ["sample.discogs_release"] as const;
 const JOB_OUTCOME = ["succeeded", "failed"] as const;
 const SYNC_KIND = ["full", "light"] as const;
+const AUTH_SUCCESS_REFUSED = ["success", "refused"] as const;
 
 export const INSTRUMENTS = [
   // Service metrics (FR-015, FR-016, FR-017; research R6).
@@ -90,6 +92,71 @@ export const INSTRUMENTS = [
     description: "Queued background jobs.",
     labels: { job_name: JOB_NAME },
     minimum: true,
+  },
+
+  // Auth counters (002/FR-041; 002 research R10): every label a closed set (001/FR-018).
+  {
+    name: "riviera.auth.link_requests",
+    kind: "counter",
+    unit: "{request}",
+    description: "Sign-in link requests, by outcome.",
+    labels: { outcome: ["issued", "not_issued", "rate_limited", "invalid"] },
+  },
+  {
+    name: "riviera.auth.sign_ins",
+    kind: "counter",
+    unit: "{attempt}",
+    description: "Sign-in attempts, by method and outcome.",
+    labels: {
+      method: ["invite_link", "sign_in_link", "link_code"],
+      outcome: AUTH_SUCCESS_REFUSED,
+    },
+  },
+  {
+    name: "riviera.auth.link_code_attempts",
+    kind: "counter",
+    unit: "{attempt}",
+    description: "Link-code redemption attempts, by outcome.",
+    labels: { outcome: ["success", "wrong", "rate_limited"] },
+  },
+  {
+    name: "riviera.auth.rate_limited",
+    kind: "counter",
+    unit: "{refusal}",
+    description: "Auth requests refused by a rate limit, by limit.",
+    labels: { limit: ["link_address", "link_client", "code_client"] },
+  },
+  {
+    name: "riviera.auth.refusals",
+    kind: "counter",
+    unit: "{refusal}",
+    description: "Requests refused for a missing session, the wrong role or a failed CSRF check.",
+    labels: { reason: ["unauthenticated", "forbidden_role", "csrf_token", "csrf_origin"] },
+  },
+  {
+    name: "riviera.auth.emails",
+    kind: "counter",
+    unit: "{email}",
+    description: "Invite and sign-in emails, by kind and outcome.",
+    labels: { kind: ["invite", "sign_in"], outcome: ["sent", "failed"] },
+  },
+  {
+    name: "riviera.auth.people_actions",
+    kind: "counter",
+    unit: "{action}",
+    description: "People actions by admins, by action and outcome.",
+    labels: {
+      action: [
+        "invite",
+        "resend",
+        "cancel",
+        "deactivate",
+        "reactivate",
+        "role_change",
+        "sign_out_everywhere",
+      ],
+      outcome: AUTH_SUCCESS_REFUSED,
+    },
   },
 
   // SLO metrics (FR-014), recorded by later features.

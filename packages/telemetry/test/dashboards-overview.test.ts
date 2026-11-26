@@ -65,13 +65,26 @@ describe("OTel → Prometheus name translation (research R7)", () => {
     const rows = [
       ...contract.matchAll(/^\| `(riviera\.[a-z_.]+)` \|.*\| `(riviera_[a-z_]+\*?)` \|$/gm),
     ];
-    // The minimum and service metrics table lists every instrument that feeds no SLO.
-    expect(rows.length).toBe(registry.filter((def) => def.slo === undefined).length);
+    // The minimum and service metrics table lists every instrument that feeds no SLO, except
+    // the auth counters, which 002 adds (next test).
+    const unlisted = (def: InstrumentDef): boolean =>
+      def.slo === undefined && !def.name.startsWith("riviera.auth.");
+    expect(rows.length).toBe(registry.filter(unlisted).length);
     for (const [, otel = "", prom = ""] of rows) {
       const def = definition(otel);
       const expected = def.kind === "histogram" ? `${prometheusName(def)}_*` : prometheusName(def);
       expect(expected, otel).toBe(prom);
     }
+  });
+
+  it("002/FR-041: the auth counters are exported as riviera_auth_<name>_total (002 quickstart §6)", () => {
+    const auth = registry.filter((def) => def.name.startsWith("riviera.auth."));
+    expect(auth).toHaveLength(7);
+    for (const def of auth) {
+      const suffix = def.name.slice("riviera.auth.".length);
+      expect(prometheusName(def), def.name).toBe(`riviera_auth_${suffix}_total`);
+    }
+    expect(promName("riviera.auth.sign_ins")).toBe("riviera_auth_sign_ins_total");
   });
 
   it("001/FR-026: follows UnderscoreEscapingWithSuffixes for each kind and unit", () => {
