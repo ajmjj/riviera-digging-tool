@@ -183,6 +183,6 @@ Antn is the only admin at launch, and admins can make others admins (spec 002, F
 
 - Does the shop owner agree to staff purchases going through the API, and to the discount rule as written?
 - ~~Should the shop owner get read-only access to the staff purchases log without being an admin?~~ No: two roles only, admin and staff; a further role would be a change to spec 002 (decided 2026-11-25).
-- Is the shelf order simply alphabetical by box code (A01…), or does it need its own list?
+- Is the shelf order simply alphabetical by box code (A01…), or does it need its own list? Box codes are names such as `House Keller 12`, not `A01` (full list from Antn, 2026-11-26: `docs/shop-locations.md`). Still open: the order, and which locations aren't dug; see that file's questions.
 - Which separate domain should the tool use (section 12, Domain)? Or does the shop want to move `rivierarecords.de` DNS from IONOS to Cloudflare?
 - ~~Which email address and SMTP service will send the sign-in links?~~ IONOS SMTP, from a mailbox on `rivierarecords.de` set as `EMAIL_FROM` (decided 2026-11-25; spec 002, FR-037).
